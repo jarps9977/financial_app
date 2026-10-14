@@ -196,17 +196,28 @@
 /* The 3:1 PNG has transparent/black margins around the glowing frame (frame spans ~4-97% x, ~14-87% y),
    so it is scaled up and offset to put the frame exactly on the card edge */
 .stat[class*="accent-"] {
+  position: relative;
+  isolation: isolate;
   min-height: 6.5rem;
   padding: var(--space-4) var(--space-5);
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--stat-accent) 35%, var(--border));
   border-radius: 1rem;
-  background-color: #0b1220;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  overflow: hidden;
+}
+/* Artwork on a pseudo layer so its strength follows --stat-art-opacity (soft in light, stronger in dark) */
+.stat[class*="accent-"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
   background-position: 55% 52%;
   background-size: 108% 136%;
   background-repeat: no-repeat;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
-  color: #fff;
-  overflow: hidden;
+  opacity: var(--stat-art-opacity);
 }
 .stat[class*="accent-"] .stat-body { display: grid; gap: 0.125rem; }
 .stat[class*="accent-"] .stat-label { font-size: var(--fs-sm); line-height: 1.4; }
@@ -221,14 +232,18 @@
 @media (min-width: 1280px) {
   .grid-stats:has(.stat[class*="accent-"]) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-.stat.accent-green { --stat-accent: #5eead4; background-image: url('../icons/background_teal.png'); }
-.stat.accent-red { --stat-accent: #fda4af; background-image: url('../icons/background_pink.png'); }
-.stat.accent-blue { --stat-accent: #22d3ee; background-image: url('../icons/background_blue.png'); }
-.stat.accent-purple { --stat-accent: #c4b5fd; background-image: url('../icons/background_purple.png'); }
+.stat.accent-green { --stat-accent: var(--acc-green); }
+.stat.accent-red { --stat-accent: var(--acc-red); }
+.stat.accent-blue { --stat-accent: var(--acc-blue); }
+.stat.accent-purple { --stat-accent: var(--acc-purple); }
+.stat.accent-green::before { background-image: url('../icons/background_teal.png'); }
+.stat.accent-red::before { background-image: url('../icons/background_pink.png'); }
+.stat.accent-blue::before { background-image: url('../icons/background_blue.png'); }
+.stat.accent-purple::before { background-image: url('../icons/background_purple.png'); }
 .stat[class*="accent-"] .stat-label,
-.stat[class*="accent-"] .stat-hint { color: rgb(255 255 255 / 0.82); font-weight: 400; }
+.stat[class*="accent-"] .stat-hint { color: var(--text-2); font-weight: 400; }
 .stat[class*="accent-"] .stat-value { color: var(--stat-accent); font-weight: 600; }
-.stat[class*="accent-"].is-neg .stat-value { color: #fca5a5; }
+.stat[class*="accent-"].is-neg .stat-value { color: var(--neg); }
 @media (min-width: 1024px) {
   .stat.has-icon { gap: var(--space-4); }
   .stat-icon { width: 3.5rem; height: 3.5rem; font-size: 1.5rem; }
