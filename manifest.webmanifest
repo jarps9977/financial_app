@@ -1,0 +1,16 @@
+{
+  "name": "Ngern - รายรับรายจ่ายรายปี",
+  "short_name": "Ngern",
+  "description": "ติดตามรายรับรายจ่ายรายปี บันทึกลง Google Sheets",
+  "lang": "th",
+  "start_url": "./#/",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6f8",
+  "theme_color": "#0b6b53",
+  "icons": [
+    { "src": "icons/app_icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/app_icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
