@@ -33,7 +33,7 @@ attachPullToRefresh(() => refresh({ fresh: true }));
 
 let current = null;
 let renderToken = 0;
-// Hidden longer than this asks for the PIN again
+// No touch/keyboard input (or app in background) for this long asks for the PIN again
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 const OPEN_PATHS = ['/login', '/pin'];
 
@@ -142,14 +142,20 @@ window.addEventListener('hashchange', renderRoute);
 renderRoute();
 if (isConfigured() && isUnlocked()) refresh();
 
-let hiddenAt = 0;
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    hiddenAt = Date.now();
-  } else if (hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS && isUnlocked()) {
-    lockApp();
-  }
+// Idle lock: background time counts as idle because no input arrives while hidden.
+// Timers are throttled in the background, so the check also runs when the app becomes visible.
+let lastActive = Date.now();
+const markActive = () => { lastActive = Date.now(); };
+const checkIdle = () => {
+  if (isUnlocked() && Date.now() - lastActive > AUTO_LOCK_MS) lockApp();
+};
+['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach((type) => {
+  window.addEventListener(type, markActive, { passive: true, capture: true });
 });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) checkIdle();
+});
+setInterval(checkIdle, 15000);
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => { /* offline shell is optional */ });

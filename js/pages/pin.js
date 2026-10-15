@@ -93,7 +93,7 @@ function view() {
   document.addEventListener('keydown', keyHandler);
 
   paint();
-  return h('div', { class: 'login' },
+  return h('div', { class: 'pin-screen' },
     h('div', { class: 'login-card card pin-card' },
       h('img', { src: 'icons/app_icon.png', alt: '', class: 'login-logo', width: '72', height: '72', decoding: 'async' }),
       h('h2', { class: 'login-title' }, 'ใส่ PIN'),
