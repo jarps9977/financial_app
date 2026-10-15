@@ -168,7 +168,7 @@ function groupBill(entry, ym, look) {
     },
   },
   h('span', { class: 'bill-main' },
-    h('span', { class: 'bill-name' }, entry.group, h('span', { class: 'badge' }, 'บิลบัตร')),
+    h('span', { class: 'bill-name' }, h('span', { class: 'bill-name-text' }, entry.group), h('span', { class: 'badge' }, 'บิลบัตร')),
     h('span', { class: 'bill-sub' }, sub)),
   h('span', { class: 'bill-amount num' }, money(entry.amount)),
   h('span', { class: 'bill-chevron', 'aria-hidden': 'true' }, icon('chevron-down')));

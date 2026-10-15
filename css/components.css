@@ -849,7 +849,10 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 
 /* ---------- Bills checklist ---------- */
 .bills-card .progress { margin-bottom: var(--space-3); }
-.bill-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.bills-card { min-width: 0; max-width: 100%; }
+/* minmax(0,1fr) stops long names from widening the grid track past the card */
+.bill-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+.bill-list li, .bill-group { min-width: 0; }
 .bill-row {
   display: flex;
   align-items: center;
@@ -879,7 +882,7 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 .bill-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .bill-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bill-sub { font-size: var(--fs-xs); color: var(--text-2); }
-.bill-amount { font-weight: 700; }
+.bill-amount { flex: none; font-weight: 700; white-space: nowrap; }
 .bill-row.is-paid { background: color-mix(in srgb, var(--pos) 7%, var(--surface)); border-color: color-mix(in srgb, var(--pos) 35%, var(--border)); }
 .bill-row.is-paid .bill-name,
 .bill-row.is-paid .bill-amount { color: var(--text-2); text-decoration: line-through; text-decoration-thickness: 1px; }
@@ -903,8 +906,10 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
   text-align: left;
   cursor: pointer;
 }
-.bill-toggle .bill-name { display: flex; align-items: center; gap: var(--space-2); }
-.bill-chevron { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--surface-2); color: var(--text-2); transition: transform 0.2s; }
+.bill-toggle .bill-name { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.bill-toggle .badge { flex: none; }
+.bill-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bill-chevron { flex: none; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--surface-2); color: var(--text-2); transition: transform 0.2s; }
 .bill-group.is-open .bill-chevron { transform: rotate(180deg); }
 .bill-group.is-open > .bill-row { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .bill-row.is-group.is-paid .bill-toggle .badge { text-decoration: none; }
@@ -913,6 +918,7 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
   margin: 0;
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-6, 2.5rem);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   border: 1px solid var(--border);
   border-top: 0;
@@ -922,6 +928,13 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 .bill-row.is-nested { min-height: 3rem; padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2); border-radius: var(--radius-sm); }
 .bill-row.is-nested .bill-check { width: 1.25rem; height: 1.25rem; }
 .bill-row.is-nested .bill-name { font-weight: 500; }
+@media (max-width: 480px) {
+  .bill-row { gap: var(--space-2); padding-right: var(--space-3); }
+  .bill-row.is-group { padding: 0 var(--space-1) 0 var(--space-1); }
+  .bill-toggle { gap: var(--space-2); padding: var(--space-2) var(--space-1); }
+  .bill-icon { width: 2.25rem; height: 2.25rem; }
+  .bill-sublist { padding-left: var(--space-4); }
+}
 
 /* ---------- Month balance hero (home) ---------- */
 .balance-hero {
