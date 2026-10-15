@@ -1263,7 +1263,9 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 
 /* PIN lock screen: pinned to the viewport, never scrolls or bounces */
 html:has(.pin-screen),
-html:has(.pin-screen) body { overflow: hidden; overscroll-behavior: none; height: 100%; }
+html:has(.pin-screen) body { overflow: hidden; overscroll-behavior: none; height: 100%; min-height: 0; }
+/* Nothing in flow under the overlay, so iOS has no document height left to scroll */
+html:has(.pin-screen) .app-main { padding: 0; min-height: 0; }
 .pin-screen {
   position: fixed;
   inset: 0;

@@ -1,5 +1,5 @@
 // Bump on every deploy so old shells are dropped
-const VERSION = 'ngern-v40';
+const VERSION = 'ngern-v41';
 
 const SHELL = [
   './',
@@ -51,7 +51,7 @@ const SHELL = [
 const CDN_ORIGINS = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -77,8 +77,9 @@ self.addEventListener('fetch', (e) => {
   }
   if (url.origin !== self.location.origin) return;
 
-  // Network first keeps deploys fresh; cache is the offline fallback
-  e.respondWith(fetch(req).then((res) => {
+  // Network first keeps deploys fresh; cache is the offline fallback.
+  // no-cache revalidates with the server so GitHub Pages' 10 min HTTP cache never mixes old CSS with new JS.
+  e.respondWith(fetch(req, { cache: 'no-cache' }).then((res) => {
     if (res.ok) {
       const copy = res.clone();
       caches.open(VERSION).then((c) => c.put(req, copy));
