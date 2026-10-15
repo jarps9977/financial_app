@@ -18,6 +18,7 @@ route('/group/:name', () => import('./pages/group.js'));
 route('/group/:name/new', () => import('./pages/item-form.js'));
 route('/group/:name/edit/:row', () => import('./pages/item-form.js'));
 route('/report', () => import('./pages/report.js'));
+route('/bills', () => import('./pages/bills.js'));
 route('/import', () => import('./pages/import.js'));
 route('/settings', () => import('./pages/settings.js'));
 
@@ -25,9 +26,9 @@ applyTheme(getSettings().theme);
 
 const shell = createShell(document.getElementById('app'), {
   onAdd: openAddPicker,
-  onRefresh: () => refresh(),
+  onRefresh: () => refresh({ fresh: true }),
 });
-attachPullToRefresh(() => refresh());
+attachPullToRefresh(() => refresh({ fresh: true }));
 
 let current = null;
 let renderToken = 0;

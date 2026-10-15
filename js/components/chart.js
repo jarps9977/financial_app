@@ -92,10 +92,11 @@ export function MonthChart({ values, limits = [], current = -1, label }) {
   }));
 }
 
-// Monthly balance around zero, positive green / negative red
-export function BalanceChart({ values, current = -1, label }) {
+// Monthly balance around zero, positive green / negative red; categories allow a rolling window across years
+export function BalanceChart({ values, current = -1, label, categories = MONTHS_SHORT }) {
   return mount('chart-balance', '17rem', label, () => ({
     ...baseChart('column', label),
+    xAxis: { categories, crosshair: true },
     legend: { enabled: false },
     tooltip: { valueDecimals: 2, valueSuffix: ' บาท' },
     plotOptions: {

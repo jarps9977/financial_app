@@ -10,12 +10,22 @@ export class ApiError extends Error {
   }
 }
 
-function isValidData(d) {
-  return d && Number.isInteger(d.year) && Array.isArray(d.groups)
-    && d.groups.every((g) => g && typeof g.name === 'string' && Array.isArray(g.items));
+const validGroups = (groups) => Array.isArray(groups)
+  && groups.every((g) => g && typeof g.name === 'string' && Array.isArray(g.items));
+
+export function isValidData(d) {
+  return Boolean(d) && Number.isInteger(d.year) && validGroups(d.groups);
 }
 
-export async function call(action, payload = {}) {
+// Writes answer with only what changed: { partial: true, groups, added, removed }
+export function isGroupPatch(d) {
+  return Boolean(d) && d.partial === true && validGroups(d.groups)
+    && (d.added === undefined || validGroups(d.added))
+    && (d.removed === undefined || (Array.isArray(d.removed) && d.removed.every((n) => typeof n === 'string')));
+}
+
+// isValid checks the response shape; partial actions (setPaid) pass their own check
+export async function call(action, payload = {}, isValid = isValidData) {
   const { apiUrl, passcode } = getSettings();
   if (!isValidApiUrl(apiUrl)) throw new ApiError('ยังไม่ได้ตั้งค่า API URL', 'config');
 
@@ -51,6 +61,6 @@ export async function call(action, payload = {}) {
     throw new ApiError('ข้อมูลตอบกลับไม่ถูกต้อง ตรวจสอบ URL และการ Deploy', 'parse');
   }
   if (!body || !body.ok) throw new ApiError((body && body.error) || 'เกิดข้อผิดพลาด', body && body.code);
-  if (!isValidData(body.data)) throw new ApiError('รูปแบบข้อมูลไม่ถูกต้อง ตรวจสอบเวอร์ชัน Apps Script', 'parse');
+  if (!isValid(body.data)) throw new ApiError('รูปแบบข้อมูลไม่ถูกต้อง ตรวจสอบเวอร์ชัน Apps Script', 'parse');
   return body.data;
 }

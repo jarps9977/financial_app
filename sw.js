@@ -1,15 +1,11 @@
 // Bump on every deploy so old shells are dropped
-const VERSION = 'ngern-v15';
+const VERSION = 'ngern-v34';
 
 const SHELL = [
   './',
   'index.html',
   'manifest.webmanifest',
   'icons/app_icon.png',
-  'icons/background_blue.png',
-  'icons/background_pink.png',
-  'icons/background_purple.png',
-  'icons/background_teal.png',
   'css/tokens.css',
   'css/layout.css',
   'css/components.css',
@@ -44,6 +40,7 @@ const SHELL = [
   'js/pages/group-form.js',
   'js/pages/item-form.js',
   'js/pages/report.js',
+  'js/pages/bills.js',
   'js/pages/import.js',
   'js/pages/login.js',
   'js/pages/settings.js',

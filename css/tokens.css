@@ -32,12 +32,13 @@
   --accent-text: #0f766e;
   --blue: #2563eb;
 
-  /* Stat card artwork: accent text colors and how strongly the PNG shows through */
+  /* Stat cards: accent colors, background tint and glow strength */
   --acc-green: #0f766e;
   --acc-red: #be123c;
   --acc-blue: #1d4ed8;
   --acc-purple: #6d28d9;
-  --stat-art-opacity: 0.28;
+  --stat-tint: 10%;
+  --stat-glow: 18%;
 
   --font: 'Noto Sans Thai', 'Sarabun', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --fs-xs: 0.75rem;
@@ -93,7 +94,8 @@
   --acc-red: #fda4af;
   --acc-blue: #22d3ee;
   --acc-purple: #c4b5fd;
-  --stat-art-opacity: 0.55;
+  --stat-tint: 16%;
+  --stat-glow: 30%;
     --scrim: rgb(0 0 0 / 0.6);
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5);
@@ -127,7 +129,8 @@
   --acc-red: #fda4af;
   --acc-blue: #22d3ee;
   --acc-purple: #c4b5fd;
-  --stat-art-opacity: 0.55;
+  --stat-tint: 16%;
+  --stat-glow: 30%;
   --scrim: rgb(0 0 0 / 0.6);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5);

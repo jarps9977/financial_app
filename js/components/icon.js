@@ -68,5 +68,15 @@ const PHOSPHOR = {
   'cart3': 'shopping-cart',
 };
 
-// Phosphor Icons, Fill weight (https://phosphoricons.com/); .ico is the shared styling hook
-export const icon = (name) => h('i', { class: `ico ph-fill ph-${PHOSPHOR[name] || name}`, 'aria-hidden': 'true' });
+// Pure line glyphs render as a solid tile with a knocked-out mark in the Fill weight, so they use Bold
+const BOLD = new Set([
+  'x', 'plus', 'check', 'caret-left', 'caret-right', 'caret-down', 'arrow-left', 'arrow-up', 'arrow-down',
+  'arrow-down-left', 'arrow-clockwise', 'arrows-clockwise', 'dots-three', 'dots-three-vertical',
+  'list', 'list-bullets', 'list-checks', 'infinity',
+]);
+
+// Phosphor Icons (https://phosphoricons.com/): Fill for shapes, Bold for line glyphs; .ico is the shared styling hook
+export function icon(name) {
+  const ph = PHOSPHOR[name] || name;
+  return h('i', { class: `ico ${BOLD.has(ph) ? 'ph-bold' : 'ph-fill'} ph-${ph}`, 'aria-hidden': 'true' });
+}

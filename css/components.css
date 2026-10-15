@@ -41,6 +41,24 @@
 .btn-danger-ghost { background: transparent; color: var(--neg); }
 .btn-danger-ghost:not(:disabled):hover { background: var(--neg-soft); }
 .btn-block { display: flex; width: 100%; }
+
+/* "More" menu button: soft round tile that takes the parent's accent on hover */
+.btn-kebab {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--cat, var(--text-2)) 25%, var(--border));
+  background: color-mix(in srgb, var(--cat, var(--text-2)) 8%, var(--surface));
+  color: var(--text-2);
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn-kebab .ico { font-size: 1.25rem; }
+.btn-kebab:not(:disabled):hover,
+.btn-kebab:focus-visible {
+  background: color-mix(in srgb, var(--cat, var(--primary)) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--cat, var(--primary)) 55%, transparent);
+  color: var(--cat, var(--text));
+}
 .btn-accent {
   background: linear-gradient(135deg, var(--teal), var(--teal-2));
   color: var(--accent-contrast);
@@ -192,39 +210,46 @@
   color: var(--stat-accent);
   background: color-mix(in srgb, var(--stat-accent) 18%, transparent);
 }
-/* PNG artwork (border, glow, wave) is the whole card; it is dark in both themes so text stays light */
-/* The 3:1 PNG has transparent/black margins around the glowing frame (frame spans ~4-97% x, ~14-87% y),
-   so it is scaled up and offset to put the frame exactly on the card edge */
+/* Glowing tinted card built in CSS: soft accent gradient, accent border with outer glow, SVG wave at the bottom */
 .stat[class*="accent-"] {
   position: relative;
   isolation: isolate;
   min-height: 6.5rem;
   padding: var(--space-4) var(--space-5);
-  border: 1px solid color-mix(in srgb, var(--stat-accent) 35%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--stat-accent) 55%, transparent);
   border-radius: 1rem;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--stat-accent) var(--stat-tint), transparent), transparent 70%),
+    linear-gradient(135deg, color-mix(in srgb, var(--stat-accent) var(--stat-tint), var(--surface)), var(--surface));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--stat-accent) 18%, transparent),
+    0 0 18px color-mix(in srgb, var(--stat-accent) var(--stat-glow), transparent),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
   color: var(--text);
   overflow: hidden;
 }
-/* Artwork on a pseudo layer so its strength follows --stat-art-opacity (soft in light, stronger in dark) */
-.stat[class*="accent-"]::before {
-  content: '';
+.stat-wave {
   position: absolute;
-  inset: 0;
+  right: 0;
+  bottom: 0;
   z-index: -1;
-  border-radius: inherit;
-  background-position: 55% 52%;
-  background-size: 108% 136%;
-  background-repeat: no-repeat;
-  opacity: var(--stat-art-opacity);
+  width: 72%;
+  height: 70%;
+  color: var(--stat-accent);
+  pointer-events: none;
+  /* Fade the left side so the wave blends into the card */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 40%);
+  mask-image: linear-gradient(to right, transparent, #000 40%);
 }
+.stat-wave .wave-back { fill: currentColor; fill-opacity: 0.08; }
+.stat-wave .wave-fill { fill: currentColor; fill-opacity: 0.14; }
+.stat-wave .wave-line { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-opacity: 0.55; vector-effect: non-scaling-stroke; }
 .stat[class*="accent-"] .stat-body { display: grid; gap: 0.125rem; }
 .stat[class*="accent-"] .stat-label { font-size: var(--fs-sm); line-height: 1.4; }
 .stat[class*="accent-"] .stat-value { font-size: 1.5rem; line-height: 1.25; }
 .stat[class*="accent-"] .stat-hint { font-size: var(--fs-xs); line-height: 1.4; }
 
-/* Wide artwork stretches badly in narrow tiles: 1 column on phones, 2 on tablets, 4 from 1280px */
+/* Long values need room: 1 column on phones, 2 on tablets, 4 from 1280px */
 .grid-stats:has(.stat[class*="accent-"]) { grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 640px) {
   .grid-stats:has(.stat[class*="accent-"]) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -232,14 +257,14 @@
 @media (min-width: 1280px) {
   .grid-stats:has(.stat[class*="accent-"]) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+@media (min-width: 1024px) {
+  .grid-stats.grid-stats-3:has(.stat[class*="accent-"]) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid-stats.grid-stats-2:has(.stat[class*="accent-"]) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .stat.accent-green { --stat-accent: var(--acc-green); }
 .stat.accent-red { --stat-accent: var(--acc-red); }
 .stat.accent-blue { --stat-accent: var(--acc-blue); }
 .stat.accent-purple { --stat-accent: var(--acc-purple); }
-.stat.accent-green::before { background-image: url('../icons/background_teal.png'); }
-.stat.accent-red::before { background-image: url('../icons/background_pink.png'); }
-.stat.accent-blue::before { background-image: url('../icons/background_blue.png'); }
-.stat.accent-purple::before { background-image: url('../icons/background_purple.png'); }
 .stat[class*="accent-"] .stat-label,
 .stat[class*="accent-"] .stat-hint { color: var(--text-2); font-weight: 400; }
 .stat[class*="accent-"] .stat-value { color: var(--stat-accent); font-weight: 600; }
@@ -325,6 +350,19 @@
 .year-label { display: flex; align-items: center; gap: var(--space-2); font-weight: 600; font-size: var(--fs-lg); }
 .year-label .ico { color: var(--text-2); font-size: 1rem; }
 @media (min-width: 640px) { .year-switch { align-self: flex-start; min-width: 20rem; } }
+
+/* Year dropdown (group pages): icon sits inside the select */
+.year-select { position: relative; display: inline-flex; align-items: center; flex: none; }
+.year-select > .ico { position: absolute; left: 0.875rem; color: var(--text-2); pointer-events: none; }
+/* Two classes so it beats the later generic .input padding shorthand */
+.year-select .year-select-input {
+  min-height: 2.75rem;
+  width: auto;
+  padding: 0 2.25rem 0 2.5rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
 
 /* Year switch inside the page hero: full width on mobile, compact pill on wider screens */
 .hero-year { flex: 1 1 100%; }
@@ -487,6 +525,31 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 .hero-add { display: none; }
 .form-hero-sub { color: var(--text-2); }
 .form-hero-art { display: none; }
+
+/* Range summary under start/end (spans years) */
+.range-info:not(:empty) {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--purple) 10%, var(--surface));
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.range-info .ico { margin-top: 0.2rem; color: var(--purple); }
+.range-info strong { color: var(--text); font-weight: 600; }
+
+/* Year headings in the month panel and read-only tiles for projected years */
+.other-year-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0 var(--space-2); font-size: var(--fs-sm); }
+.other-year-head strong { font-size: var(--fs-md); }
+.other-year { border-top: 1px dashed var(--border); margin-top: var(--space-4); }
+.month-tiles.is-preview { list-style: none; margin: 0; padding: 0; }
+.month-tiles.is-preview .month-tile { min-height: var(--touch); border-style: dashed; }
+.month-tiles.is-preview .month-tile.is-on { border-style: solid; border-color: color-mix(in srgb, var(--purple) 45%, var(--border)); background: color-mix(in srgb, var(--purple) 8%, var(--surface)); }
+.month-tiles.is-preview .month-check { cursor: default; padding-left: var(--space-2); }
+.month-preview { flex: 1; padding-right: var(--space-2); color: var(--text-2); }
+.month-tile.is-on .month-preview { color: var(--text); font-weight: 600; }
 
 /* ---------- Collapsible card (month amounts) ---------- */
 .card-collapse > summary { list-style: none; cursor: pointer; margin: calc(-1 * var(--space-2)); padding: var(--space-2); border-radius: var(--radius-sm); transition: background-color 0.15s; }
@@ -784,6 +847,167 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 }
 .mini-title { font-weight: 500; }
 
+/* ---------- Bills checklist ---------- */
+.bills-card .progress { margin-bottom: var(--space-3); }
+.bill-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.bill-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.75rem;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, opacity 0.15s;
+}
+.bill-row:hover { border-color: color-mix(in srgb, var(--cat) 55%, var(--border)); }
+.bill-row:has(.bill-check:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+.bill-check { width: 1.5rem; height: 1.5rem; margin: 0 var(--space-1); flex: none; accent-color: var(--teal-2); cursor: pointer; }
+.bill-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.625rem;
+  font-size: 1.15rem;
+  color: var(--cat);
+  background: color-mix(in srgb, var(--cat) 16%, var(--surface));
+}
+.bill-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.bill-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bill-sub { font-size: var(--fs-xs); color: var(--text-2); }
+.bill-amount { font-weight: 700; }
+.bill-row.is-paid { background: color-mix(in srgb, var(--pos) 7%, var(--surface)); border-color: color-mix(in srgb, var(--pos) 35%, var(--border)); }
+.bill-row.is-paid .bill-name,
+.bill-row.is-paid .bill-amount { color: var(--text-2); text-decoration: line-through; text-decoration-thickness: 1px; }
+.bill-row.is-paid .bill-sub { color: var(--pos); }
+.bill-row.is-pending { opacity: 0.6; cursor: progress; }
+
+/* ---------- Month balance hero (home) ---------- */
+.balance-hero {
+  --bal: var(--pos);
+  position: relative;
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--bal) 45%, transparent);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(110% 130% at 0% 0%, color-mix(in srgb, var(--bal) var(--stat-tint), transparent), transparent 65%),
+    linear-gradient(135deg, color-mix(in srgb, var(--bal) 8%, var(--surface)), var(--surface));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--bal) var(--stat-glow), transparent);
+}
+.balance-hero.is-neg { --bal: var(--neg); }
+.balance-main { display: grid; gap: var(--space-1); align-content: center; }
+.balance-label { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); color: var(--text-2); font-weight: 500; }
+.balance-label .ico { color: var(--bal); font-size: 1.25rem; }
+.balance-amount { text-align: left; font-size: clamp(2.25rem, 7vw, 3.25rem); font-weight: 700; line-height: 1.1; color: var(--bal); letter-spacing: -0.01em; }
+.balance-status { color: var(--text-2); }
+.balance-side { display: grid; gap: var(--space-3); }
+
+.balance-equation { display: flex; align-items: stretch; flex-wrap: wrap; gap: var(--space-2); }
+.eq-part {
+  display: grid;
+  flex: 1 1 7rem;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--text-2) 8%, var(--surface));
+}
+.eq-label { font-size: var(--fs-xs); color: var(--text-2); }
+.eq-value { text-align: left; font-weight: 700; }
+.eq-part.is-in .ico { color: var(--accent-text); }
+.eq-part.is-out .ico { color: var(--neg); }
+.eq-part.is-pos .eq-value { color: var(--pos); }
+.eq-part.is-neg .eq-value { color: var(--neg); }
+.eq-part.is-pos, .eq-part.is-neg { background: color-mix(in srgb, var(--bal) 12%, var(--surface)); }
+.eq-op { align-self: center; font-size: 1.25rem; font-weight: 700; color: var(--text-2); }
+.balance-usage .progress-fill { background: var(--bal); }
+
+.balance-compare { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.compare-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.compare-chip .num { font-weight: 700; }
+.compare-chip.is-pos .num { color: var(--pos); }
+.compare-chip.is-neg .num { color: var(--neg); }
+.compare-chip:hover { border-color: var(--text-2); }
+
+@media (min-width: 1024px) {
+  .balance-hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: var(--space-5); padding: var(--space-5) 2rem; }
+}
+
+/* ---------- Rolling month timeline (home) ---------- */
+.timeline {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(7.5rem, 1fr);
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.tl-tile {
+  --bal: var(--pos);
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--bal) 30%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bal) 6%, var(--surface));
+  text-align: left;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: border-color 0.15s, background-color 0.15s, transform 0.15s;
+}
+.tl-tile.is-neg { --bal: var(--neg); }
+.tl-tile:hover { border-color: var(--bal); }
+.tl-tile[aria-pressed="true"] {
+  border-color: var(--bal);
+  background: color-mix(in srgb, var(--bal) 16%, var(--surface));
+  box-shadow: 0 0 0 1px var(--bal), 0 0 14px color-mix(in srgb, var(--bal) 30%, transparent);
+}
+.tl-month { display: flex; align-items: center; gap: var(--space-1); font-size: var(--fs-sm); color: var(--text-2); }
+.tl-tile.is-today .tl-month::after { content: ''; width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--accent-text); }
+.tl-amount { text-align: left; font-weight: 700; color: var(--bal); font-size: var(--fs-sm); }
+.tl-meter { display: block; height: 0.3rem; border-radius: 999px; background: color-mix(in srgb, var(--text-2) 16%, transparent); overflow: hidden; }
+.tl-meter > span { display: block; width: var(--w, 0%); height: 100%; border-radius: inherit; background: var(--bal); }
+@media (min-width: 1280px) {
+  .timeline { grid-auto-flow: row; grid-template-columns: repeat(6, minmax(0, 1fr)); overflow: visible; }
+}
+
+/* ---------- Outstanding bills summary (home) ---------- */
+.outstanding { display: grid; gap: var(--space-4); }
+.outstanding-summary { display: grid; gap: var(--space-3); align-content: start; }
+.outstanding-figures { display: grid; gap: var(--space-3); }
+.outstanding-amount { text-align: left; font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
+.outstanding-amount.is-due { color: var(--neg); }
+.outstanding-amount.is-done { color: var(--pos); }
+.outstanding-list .mini-row { align-items: center; gap: var(--space-3); justify-content: flex-start; }
+.outstanding-list .mini-main { flex: 1; }
+.outstanding-more { padding-top: var(--space-2); font-size: var(--fs-sm); }
+.outstanding-done { display: flex; align-items: center; gap: var(--space-2); color: var(--pos); font-weight: 600; }
+@media (min-width: 640px) {
+  .outstanding-figures { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: center; }
+}
+@media (min-width: 1024px) {
+  .outstanding { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-5); }
+}
+
 /* ---------- Section heading with round icon ---------- */
 .section-head { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-lg); font-weight: 700; }
 .section-icon {
@@ -867,26 +1091,66 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 .items-card { padding: 0; overflow: hidden; }
 /* Reset the generic card bleed margin; with overflow hidden it clipped the total row */
 .items-card .table-wrap { margin: 0; border: 0; border-radius: 0; }
+/* Every checkbox sits centered in a 3.5rem column flush with the card's left edge, so toolbar, header,
+   rows and the mobile list line up on the same vertical axis */
+.items-card { --check-col: 3.5rem; }
 .table-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--space-2) var(--space-3);
+  min-height: 3.75rem;
+  padding: var(--space-2) var(--space-4) var(--space-2) 0;
   border-bottom: 1px solid var(--border);
 }
-.toolbar-select { display: flex; align-items: center; gap: var(--space-2); }
+.toolbar-select { display: flex; align-items: center; }
 .toolbar-sep { width: 1px; height: 1.75rem; background: var(--border); }
-.sel-count { font-size: var(--fs-sm); }
+.toolbar-total { padding-left: var(--space-4); font-size: var(--fs-sm); }
+.toolbar-spacer { flex: 1; }
+.sel-count { font-size: var(--fs-sm); white-space: nowrap; }
 .check-wrap { display: inline-grid; place-items: center; min-width: var(--touch); min-height: var(--touch); cursor: pointer; }
+.items-card .check-wrap { width: var(--check-col); flex: none; }
 .row-check { width: 1.25rem; height: 1.25rem; margin: 0; accent-color: var(--teal-2); cursor: pointer; }
 .items-list { padding: var(--space-3); }
-.select-row { display: flex; align-items: center; gap: var(--space-1); }
+.items-card.is-selecting .items-list { padding-left: 0; }
+.select-row { display: flex; align-items: center; }
 .select-row .list-item { flex: 1; min-width: 0; }
 .select-row.is-selected .list-item { border-color: var(--teal-2); background: color-mix(in srgb, var(--teal) 8%, var(--surface)); }
 
+/* Selection mode toggles checkboxes and the matching toolbar controls */
+.items-card:not(.is-selecting) .sel-only,
+.items-card:not(.is-selecting) .col-check,
+.items-card:not(.is-selecting) .select-row > .check-wrap { display: none !important; }
+.items-card.is-selecting .idle-only { display: none !important; }
+
+/* Pill toolbar buttons; "เลือก" uses the teal accent like the active month chip */
+.btn-pill {
+  min-height: 2.5rem;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: var(--fs-sm);
+}
+.btn-pill .ico { font-size: 1.1rem; }
+.btn-pill:focus-visible { outline-offset: 3px; }
+.btn-pill.btn-ghost:not(:disabled):hover { background: var(--surface-2); border-color: color-mix(in srgb, var(--text-2) 40%, var(--border)); }
+.btn-pill.btn-danger-ghost { border-color: color-mix(in srgb, var(--neg) 40%, var(--border)); background: color-mix(in srgb, var(--neg) 6%, var(--surface)); }
+.btn-pill.btn-danger-ghost:not(:disabled):hover { background: var(--neg); border-color: var(--neg); color: #fff; }
+.btn-select {
+  border: 1px solid color-mix(in srgb, var(--teal) 45%, var(--border));
+  background: color-mix(in srgb, var(--teal) 10%, var(--surface));
+  color: var(--accent-text);
+}
+.btn-select .ico { font-size: 1.15rem; }
+.btn-pill.btn-select:not(:disabled):hover {
+  background: linear-gradient(135deg, var(--teal), var(--teal-2));
+  border-color: transparent;
+  color: var(--accent-contrast);
+}
+
 .group-table th, .group-table td { padding: var(--space-3); }
-.group-table .col-check { width: 3.5rem; padding: 0 var(--space-2); text-align: center; }
+.group-table .col-check { width: var(--check-col); padding: 0; text-align: center; }
 .group-table tbody th { left: 0; }
 .group-table .link-btn { color: var(--accent-text); font-weight: 600; }
 .group-table .is-sel { background: color-mix(in srgb, var(--teal) 16%, var(--surface)); color: var(--text); }

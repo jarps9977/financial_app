@@ -136,6 +136,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .side-link:hover { background: var(--surface-2); color: var(--text); }
 .side-link[aria-current="page"] { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
 .side-link .ico { font-size: 1.15rem; }
+/* Group links carry their palette color (tone-* sets --cat) */
+.side-groups .side-link .ico { color: var(--cat, currentColor); }
 .side-heading {
   margin-top: var(--space-2);
   padding: 0 var(--space-3);

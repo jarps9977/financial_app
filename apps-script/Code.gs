@@ -17,6 +17,11 @@
 
 const CONFIG = {
   CONFIG_SHEET: '_ngern',
+  PAID_SHEET: '_ngern_paid', // A ym, B group, C row, D item name, E paid at
+  MAX_PAID_ROWS: 5000,
+  LOAD_CACHE_KEY: 'load_v1',
+  LOAD_CACHE_TTL_SEC: 21600, // 6 hours, the CacheService maximum
+  LOAD_CACHE_MAX: 95000,
   DEFAULT_EXPENSE: ['K-Bank', 'First-Choice', 'KTC', 'Others', 'Saving'],
   DEFAULT_INCOME: 'รายรับ',
   FIRST_ITEM_ROW: 3,
@@ -58,14 +63,25 @@ function doPost(e) {
   if (authError) return reply_(authError);
 
   const handlers = {
-    load: () => load_(),
-    addItem: () => write_(ss => addItem_(ss, req)),
-    updateItem: () => write_(ss => updateItem_(ss, req)),
-    deleteItem: () => write_(ss => deleteItem_(ss, req)),
-    deleteItems: () => write_(ss => deleteItems_(ss, req)),
-    addBatch: () => write_(ss => addBatch_(ss, req)),
-    createGroup: () => write_(ss => createGroup_(ss, req)),
-    removeGroup: () => write_(ss => removeGroup_(ss, req)),
+    load: () => load_(req.fresh === true),
+    // Writes return only what changed (touched / added / removed groups) instead of the whole dataset
+    addItem: () => writePatch_(ss => { addItem_(ss, req); return { changed: [req.group] }; }),
+    updateItem: () => writePatch_(ss => { updateItem_(ss, req); return { changed: [req.group] }; }),
+    deleteItem: () => writePatch_(ss => { deleteItem_(ss, req); return { changed: [req.group] }; }),
+    deleteItems: () => writePatch_(ss => { deleteItems_(ss, req); return { changed: [req.group] }; }),
+    // Returns only the paid list; re-reading every group sheet made each tick slow
+    setPaid: () => withLock_(() => {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      setPaid_(ss, req);
+      invalidateLoad_();
+      return { paid: readPaid_(ss, ss.getSpreadsheetTimeZone()) };
+    }),
+    addBatch: () => writePatch_(ss => {
+      addBatch_(ss, req);
+      return { changed: req.items.map(it => it.group).filter((g, i, all) => all.indexOf(g) === i) };
+    }),
+    createGroup: () => writePatch_(ss => ({ added: [createGroup_(ss, req)] })),
+    removeGroup: () => writePatch_(ss => ({ removed: [removeGroup_(ss, req)] })),
   };
   if (typeof req.action !== 'string' || !Object.prototype.hasOwnProperty.call(handlers, req.action)) {
     return reply_({ ok: false, error: 'ไม่รู้จักคำสั่ง', code: 'bad_request' });
@@ -122,13 +138,28 @@ function withLock_(fn) {
   }
 }
 
-// Every mutation returns the full dataset so the client needs no extra load call
-function write_(fn) {
+// fn returns { changed, added, removed } group names; only changed/added sheets are re-read.
+// The client replaces changed groups, appends added ones and drops removed ones by name.
+function writePatch_(fn) {
   return withLock_(() => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureConfig_(ss);
-    fn(ss);
-    return read_(ss);
+    const result = fn(ss);
+    invalidateLoad_();
+    const tz = ss.getSpreadsheetTimeZone();
+    const list = readGroupList_(ss);
+    const readGroups = names => (names || []).map(name => {
+      const g = list.find(x => x.name === name);
+      const sh = g && ss.getSheetByName(name);
+      return sh ? { name: name, type: g.type, items: readItems_(sh, tz) } : null;
+    }).filter(Boolean);
+    return {
+      partial: true,
+      groups: readGroups(result.changed),
+      added: readGroups(result.added),
+      removed: result.removed || [],
+      updatedAt: new Date().toISOString(),
+    };
   });
 }
 
@@ -193,10 +224,34 @@ function columnLetter_(n) {
 
 // ---------- Read ----------
 
-function load_() {
+// Reading every group sheet is the slow part, so the full load is cached until a write or a manual edit.
+// fresh=true (refresh button / pull-to-refresh) always re-reads the sheets.
+function load_(fresh) {
+  const cache = CacheService.getScriptCache();
+  if (!fresh) {
+    const hit = cache.get(CONFIG.LOAD_CACHE_KEY);
+    if (hit) {
+      try {
+        return JSON.parse(hit);
+      } catch (e) { /* corrupt entry, rebuild below */ }
+    }
+  }
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss.getSheetByName(CONFIG.CONFIG_SHEET)) withLock_(() => ensureConfig_(ss));
-  return read_(ss);
+  const data = read_(ss);
+  const json = JSON.stringify(data);
+  // CacheService values are limited to 100KB; larger datasets simply skip the cache
+  if (json.length < CONFIG.LOAD_CACHE_MAX) cache.put(CONFIG.LOAD_CACHE_KEY, json, CONFIG.LOAD_CACHE_TTL_SEC);
+  return data;
+}
+
+function invalidateLoad_() {
+  CacheService.getScriptCache().remove(CONFIG.LOAD_CACHE_KEY);
+}
+
+// Simple trigger: edits made directly in Google Sheets also drop the cached load
+function onEdit() {
+  invalidateLoad_();
 }
 
 function read_(ss) {
@@ -216,6 +271,7 @@ function read_(ss) {
     updatedAt: new Date().toISOString(),
     groups: groups,
     missing: missing,
+    paid: readPaid_(ss, tz),
   };
 }
 
@@ -375,6 +431,61 @@ function readRowChecked_(sh, row, expectedName) {
   return { values: values, formulas: formulas };
 }
 
+// ---------- Paid checklist ----------
+
+function readPaid_(ss, tz) {
+  const sh = ss.getSheetByName(CONFIG.PAID_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const last = Math.min(sh.getLastRow(), CONFIG.MAX_PAID_ROWS + 1);
+  return sh.getRange(2, 1, last - 1, 5).getValues()
+    .map(r => ({
+      ym: normYm_(r[0], tz),
+      group: String(r[1]).trim(),
+      row: Number(r[2]),
+      name: String(r[3]).trim(),
+      paidAt: r[4] instanceof Date ? r[4].toISOString() : String(r[4] || ''),
+    }))
+    .filter(p => p.ym && p.group && Number.isInteger(p.row));
+}
+
+function ensurePaidSheet_(ss) {
+  let sh = ss.getSheetByName(CONFIG.PAID_SHEET);
+  if (sh) return sh;
+  sh = ss.insertSheet(CONFIG.PAID_SHEET);
+  sh.getRange(1, 1, 1, 5).setValues([['ym', 'group', 'row', 'name', 'paidAt']]);
+  sh.getRange(1, 1, CONFIG.MAX_PAID_ROWS + 1, 2).setNumberFormat('@');
+  sh.getRange(1, 4, CONFIG.MAX_PAID_ROWS + 1, 1).setNumberFormat('@');
+  sh.hideSheet();
+  return sh;
+}
+
+// Marks one item as paid (or not) for a month; the item name guards against a reused sheet row
+function setPaid_(ss, req) {
+  const ym = validYm_(req.ym, 'เดือน');
+  if (!ym) throw userError_('ต้องระบุเดือน');
+  if (groupNames_(ss).indexOf(req.group) === -1) throw userError_('หมวดไม่ถูกต้อง');
+  const row = validRow_(req.row);
+  const name = typeof req.name === 'string' ? req.name.trim() : '';
+  if (name.length > CONFIG.MAX_NAME) throw userError_('ชื่อรายการยาวเกินไป');
+  const paid = req.paid === true;
+
+  const sh = ensurePaidSheet_(ss);
+  const last = sh.getLastRow();
+  const tz = ss.getSpreadsheetTimeZone();
+  if (last >= 2) {
+    const values = sh.getRange(2, 1, last - 1, 3).getValues();
+    // Bottom-up so deleting rows does not shift the ones still to check
+    for (let i = values.length - 1; i >= 0; i--) {
+      if (normYm_(values[i][0], tz) === ym && String(values[i][1]).trim() === req.group && Number(values[i][2]) === row) {
+        sh.deleteRow(i + 2);
+      }
+    }
+  }
+  if (!paid) return;
+  if (sh.getLastRow() > CONFIG.MAX_PAID_ROWS) throw userError_('ประวัติการจ่ายเต็มแล้ว');
+  sh.appendRow([ym, req.group, row, safeText_(name), new Date()]);
+}
+
 // ---------- Write: groups ----------
 
 function createGroup_(ss, req) {
@@ -390,6 +501,7 @@ function createGroup_(ss, req) {
   if (!ss.getSheetByName(name)) createGroupSheet_(ss, name);
   const cfg = ss.getSheetByName(CONFIG.CONFIG_SHEET);
   cfg.getRange(cfg.getLastRow() + 1, 1, 1, 2).setNumberFormat('@').setValues([[name, req.type]]);
+  return name;
 }
 
 // Unlinks the group from the app only; the sheet tab and its data are kept
@@ -397,6 +509,7 @@ function removeGroup_(ss, req) {
   const g = readGroupList_(ss).find(x => x.name === req.name);
   if (!g) throw userError_('ไม่พบหมวดนี้', 'conflict');
   ss.getSheetByName(CONFIG.CONFIG_SHEET).deleteRow(g.configRow);
+  return g.name;
 }
 
 function groupNames_(ss) {

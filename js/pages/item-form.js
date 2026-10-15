@@ -1,5 +1,5 @@
 import { h } from '../utils/dom.js';
-import { MONTHS, MONTHS_SHORT, money, sum, parseYm, ymKey, ymString } from '../utils/format.js';
+import { MONTHS, MONTHS_SHORT, money, sum, parseYm, ymKey, ymString, ymLabel } from '../utils/format.js';
 import { findGroup, currentMonthIndex } from '../selectors.js';
 import { mutate } from '../store.js';
 import { navigate, groupPath } from '../router.js';
@@ -69,8 +69,9 @@ function view(data, params) {
     });
   }
   const year = data.year;
-  // The native picker indicator is stretched over the input; the chevron is decorative
-  const ymAttrs = { type: 'month', placeholder: 'YYYY-MM', pattern: '\\d{4}-\\d{2}', prefix: icon('calendar3'), suffix: icon('chevron-down') };
+  // The native picker indicator is stretched over the input; the chevron is decorative.
+  // A function so each field gets its own icon nodes (a shared node would be moved to the last field)
+  const ymAttrs = () => ({ type: 'month', placeholder: 'YYYY-MM', pattern: '\\d{4}-\\d{2}', prefix: icon('calendar3'), suffix: icon('chevron-down') });
 
   const nameField = Field({
     label: 'ชื่อรายการ', name: 'name', value: item ? item.name : '', required: true, maxlength: MAX_NAME,
@@ -82,13 +83,82 @@ function view(data, params) {
     hint: 'ใส่เฉพาะตัวเลข เช่น 250 หรือ 1290', hintIcon: 'info-circle',
   });
   const startField = Field({
-    label: 'เริ่มเดือน', name: 'start', ...ymAttrs,
+    label: 'เริ่มเดือน', name: 'start', ...ymAttrs(),
     value: item ? item.start : ymString(year, currentMonthIndex(year) + 1),
   });
   const endField = Field({
-    label: 'สิ้นสุดเดือน', name: 'end', ...ymAttrs, value: item ? item.end : '',
-    hint: 'เว้นว่าง = ไม่มีวันสิ้นสุด (จะใช้งานไปเรื่อย ๆ)', hintIcon: 'infinity',
+    label: 'สิ้นสุดเดือน', name: 'end', ...ymAttrs(), value: item ? item.end : '',
+    hint: 'เว้นว่าง = ไม่มีวันสิ้นสุด · ผ่อนข้ามปีใส่เดือนสุดท้ายจริง เช่น เม.ย. ปีหน้า', hintIcon: 'infinity',
   });
+
+  // Live summary of the range across years, so a range ending next year is clearly understood
+  const rangeInfo = h('div', { class: 'range-info', 'aria-live': 'polite' });
+  function updateRangeInfo() {
+    const start = parseYm(startField.input.value.trim());
+    const end = parseYm(endField.input.value.trim());
+    const amount = readAmount(amountField.input.value);
+    if (!start || (end && ymKey(start.y, start.m) > ymKey(end.y, end.m))) {
+      rangeInfo.replaceChildren();
+      return;
+    }
+    if (!end) {
+      rangeInfo.replaceChildren(icon('infinity'), h('span', {}, `ตั้งแต่ ${ymLabel(ymString(start.y, start.m))} ไม่มีวันสิ้นสุด`));
+      return;
+    }
+    const count = ymKey(end.y, end.m) - ymKey(start.y, start.m) + 1;
+    const perYear = [];
+    for (let y = start.y; y <= end.y; y++) {
+      const from = y === start.y ? start.m : 1;
+      const to = y === end.y ? end.m : 12;
+      perYear.push({ y, n: to - from + 1 });
+    }
+    rangeInfo.replaceChildren(
+      icon('calendar-check'),
+      h('span', {},
+        h('strong', {}, `${ymLabel(ymString(start.y, start.m))} – ${ymLabel(ymString(end.y, end.m))} · ${count} งวด`),
+        amount != null && ` · รวม ${money(amount * count)} บาท`,
+        h('br'),
+        perYear.map((p) => `ปี ${p.y}: ${p.n} เดือน${p.y === year ? ' (ตารางด้านล่าง)' : ' (คำนวณให้อัตโนมัติ)'}`).join(' · ')));
+  }
+  // Read-only preview of the months in other years that the range covers (those are projected, not stored)
+  const otherYears = h('div', { class: 'other-years' });
+  function updateOtherYears() {
+    const start = parseYm(startField.input.value.trim());
+    const end = parseYm(endField.input.value.trim());
+    const amount = readAmount(amountField.input.value);
+    if (!start || amount == null || (end && ymKey(start.y, start.m) > ymKey(end.y, end.m))) {
+      otherYears.replaceChildren();
+      return;
+    }
+    // Open-ended ranges preview only the next year
+    const lastYear = end ? end.y : Math.max(start.y, year + 1);
+    const from = ymKey(start.y, start.m);
+    const to = end ? ymKey(end.y, end.m) : Infinity;
+    const years = [];
+    for (let y = start.y; y <= lastYear && years.length < 5; y++) if (y !== year) years.push(y);
+    otherYears.replaceChildren(...years.map((y) => {
+      const values = MONTHS_SHORT.map((_, i) => {
+        const k = ymKey(y, i + 1);
+        return k >= from && k <= to ? amount : 0;
+      });
+      const count = values.filter(Boolean).length;
+      return h('section', { class: 'other-year', 'aria-label': `ยอดรายเดือนปี ${y}` },
+        h('p', { class: 'other-year-head' },
+          h('strong', {}, `ปี ${y}`),
+          h('span', { class: 'badge is-warn' }, 'คำนวณอัตโนมัติ'),
+          h('span', { class: 'muted' }, `${count} เดือน · รวม ${money(amount * count)} บาท${end ? '' : ' (ต่อเนื่อง)'}`)),
+        h('ul', { class: 'month-tiles is-preview' }, values.map((v, i) => h('li', { class: `month-tile${v ? ' is-on' : ''}` },
+          h('span', { class: 'month-check' }, h('span', {}, MONTHS_SHORT[i])),
+          h('span', { class: 'month-preview num' }, v ? money(v) : '–')))));
+    }));
+  }
+
+  [startField.input, endField.input, amountField.input].forEach((el) => el.addEventListener('input', () => {
+    updateRangeInfo();
+    updateOtherYears();
+  }));
+  updateOtherYears();
+  updateRangeInfo();
 
   const months = MONTHS.map((_, i) => MonthTile(i, item));
   const monthSummary = h('span', { class: 'collapse-summary' });
@@ -233,11 +303,13 @@ function view(data, params) {
     h('summary', { class: 'card-head' },
       CardIcon('calendar2-check', 'teal'),
       h('div', { class: 'card-head-text' },
-        h('h2', { class: 'card-title' }, `ยอดรายเดือน ปี ${year}`),
-        h('p', { class: 'card-sub' }, 'เลือกเดือนที่ต้องการให้รายการนี้มีผล และปรับยอดแต่ละเดือนได้'),
+        h('h2', { class: 'card-title' }, 'ยอดรายเดือน'),
+        h('p', { class: 'card-sub' }, `ปี ${year} แก้ไขได้ · ปีอื่นในช่วงเวลาแสดงเป็นยอดคำนวณอัตโนมัติ`),
         monthSummary),
       h('span', { class: 'collapse-chevron', 'aria-hidden': 'true' }, icon('chevron-down'))),
+    h('p', { class: 'other-year-head' }, h('strong', {}, `ปี ${year}`), h('span', { class: 'muted' }, 'บันทึกลง Sheet · ติ๊กและแก้ยอดได้')),
     h('div', { class: 'month-tiles' }, months.map((m) => m.tile)),
+    otherYears,
     monthError,
     months.some((m) => m.locked) && h('p', { class: 'note' }, 'เดือนที่ล็อกเป็นสูตรใน Sheet แอปจะไม่แก้ทับ'));
 
@@ -258,6 +330,7 @@ function view(data, params) {
         title: 'ช่วงเวลา', subtitle: 'กำหนดช่วงเวลาที่รายการนี้มีผล (ข้ามปีได้)', icon: 'calendar-week', tone: 'purple',
         children: h('div', { class: 'stack' },
           h('div', { class: 'form-row' }, startField.el, endField.el),
+          rangeInfo,
           Button({ label: 'เติมยอดตามช่วงเดือน', icon: 'magic', variant: 'magic', block: true, onClick: () => fillRange() })),
       })),
     monthsPanel,

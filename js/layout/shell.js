@@ -1,18 +1,20 @@
 import { h } from '../utils/dom.js';
 import { groupPath } from '../router.js';
 import { icon } from '../components/icon.js';
+import { groupLook } from '../utils/group-look.js';
 
 const NAV = {
   home: { path: '/', label: 'ภาพรวม', icon: 'house' },
   groups: { path: '/groups', label: 'หมวด', icon: 'folder2' },
+  bills: { path: '/bills', label: 'ต้องจ่าย', icon: 'clipboard-text' },
   report: { path: '/report', label: 'รายงาน', icon: 'bar-chart-line' },
   import: { path: '/import', label: 'นำเข้าสลิป', icon: 'receipt' },
   settings: { path: '/settings', label: 'ตั้งค่า', icon: 'gear' },
 };
 
-const SIDE_ITEMS = [NAV.home, NAV.groups, NAV.report, NAV.import, NAV.settings];
-// Bottom bar holds 4 links plus the add button (5 slots max)
-const BOTTOM_ITEMS = [NAV.home, NAV.groups, NAV.report, NAV.settings];
+const SIDE_ITEMS = [NAV.home, NAV.groups, NAV.bills, NAV.report, NAV.import, NAV.settings];
+// Bottom bar holds 4 links plus the add button (5 slots max); settings lives in the hamburger drawer
+const BOTTOM_ITEMS = [NAV.home, NAV.groups, NAV.bills, NAV.report];
 
 function navLink(cls, item, withIcon = true) {
   return h('li', {},
@@ -103,15 +105,22 @@ export function createShell(root, { onAdd, onRefresh }) {
     });
   }
 
+  // One "หมวด" list; the colored group icon tells expense from income, so no per-type heading
+  // (a heading "รายรับ" above a group also named "รายรับ" read as a duplicate)
   function setGroups(data) {
-    const section = (heading, groups) => groups.length > 0 && [
-      h('p', { class: 'side-heading' }, heading),
-      h('ul', { class: 'side-list' }, groups.map((g) => navLink('side-link', { path: groupPath(g.name), label: g.name }, false))),
-    ];
-    groupNav.replaceChildren(...[
-      section('หมวดรายจ่าย', data.groups.filter((g) => g.type === 'expense')),
-      section('รายรับ', data.groups.filter((g) => g.type === 'income')),
-    ].flat().filter(Boolean));
+    const expense = data.groups.filter((g) => g.type === 'expense');
+    const income = data.groups.filter((g) => g.type === 'income');
+    const link = (g, index) => {
+      const look = groupLook(g, index);
+      return h('li', {},
+        h('a', { class: `side-link tone-${look.tone}`, href: `#${groupPath(g.name)}`, dataset: { path: groupPath(g.name) } },
+          icon(look.icon),
+          h('span', { class: 'side-link-label' }, g.name)));
+    };
+    groupNav.replaceChildren(...(data.groups.length ? [
+      h('p', { class: 'side-heading' }, 'หมวด'),
+      h('ul', { class: 'side-list' }, expense.map(link), income.map(link)),
+    ] : []));
     setActive(activePath);
   }
 

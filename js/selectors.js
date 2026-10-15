@@ -71,6 +71,17 @@ export function buildReport(data, year) {
   };
 }
 
+// Expense items due in a month, with their paid state (paid record must match group, row and name)
+export function billsFor(data, year, month) {
+  const ym = `${year}-${String(month).padStart(2, '0')}`;
+  const paid = Array.isArray(data.paid) ? data.paid.filter((p) => p.ym === ym) : [];
+  return expenseGroups(data).flatMap((g) => g.items.map((item) => {
+    const amount = itemMonths(item, year, data.year)[month - 1];
+    const record = paid.find((p) => p.group === g.name && p.row === item.row && p.name === item.name);
+    return { group: g.name, item, amount, paid: Boolean(record), paidAt: record ? record.paidAt : '' };
+  })).filter((b) => b.amount);
+}
+
 export function availableYears(data) {
   const sy = data.year;
   let min = sy;

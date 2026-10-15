@@ -2,10 +2,10 @@ import { h, toNodes } from '../utils/dom.js';
 import { money, sum, ymLabel, MONTHS, MONTHS_SHORT } from '../utils/format.js';
 import { groupPath } from '../router.js';
 import { openGroupMenu } from './group-form.js';
-import { mutate, viewYear } from '../store.js';
-import { findGroup, groupMonths, itemMonths, currentMonthIndex, buildReport } from '../selectors.js';
+import { mutate, groupYear, setGroupYear } from '../store.js';
+import { findGroup, groupMonths, itemMonths, currentMonthIndex, availableYears } from '../selectors.js';
 import { Button } from '../components/button.js';
-import { Stat, MonthChips, Notice, kv } from '../components/misc.js';
+import { Stat, MonthChips, Notice, YearSelect, kv } from '../components/misc.js';
 import { LazyList } from '../components/lazy-list.js';
 import { openSheet } from '../components/bottom-sheet.js';
 import { confirmAction } from '../components/alert.js';
@@ -15,6 +15,7 @@ import { icon } from '../components/icon.js';
 // Selected month and checked rows per group survive repaints after refresh
 const selectedByGroup = {};
 const checkedByGroup = {};
+const selectingByGroup = {};
 
 export default {
   title: (p) => p.name,
@@ -36,7 +37,7 @@ function view(data, name) {
   if (!group) {
     return Empty({ title: 'ไม่พบหมวดนี้', action: Button({ label: 'กลับหน้าหมวด', href: '#/groups', variant: 'secondary' }) });
   }
-  const year = viewYear();
+  const year = groupYear();
   const key = `${name}:${year}`;
   if (!(key in selectedByGroup)) selectedByGroup[key] = currentMonthIndex(year);
 
@@ -65,7 +66,8 @@ function view(data, name) {
         h('h2', { class: 'form-hero-title' }, group.name),
         h('p', { class: 'form-hero-sub' }, `${group.type === 'income' ? 'รายรับ' : 'รายจ่าย'} · รายงานยอดในตาราง ปี ${year}`)),
       h('div', { class: 'form-hero-actions' },
-        Button({ label: 'ตัวเลือกหมวด', icon: 'three-dots-vertical', variant: 'ghost', iconOnly: true, onClick: () => openGroupMenu(group) }),
+        YearSelect({ year, years: availableYears(data), sheetYear: data.year, onChange: setGroupYear }),
+        Button({ label: 'ตัวเลือกหมวด', icon: 'three-dots-vertical', variant: 'ghost', iconOnly: true, className: 'btn-kebab', onClick: () => openGroupMenu(group) }),
         Button({ label: 'เพิ่มรายการ', icon: 'plus-lg', variant: 'accent', href: addHref, className: 'hero-add' }))),
     year !== data.year && Notice({ tone: 'warn', text: `ปี ${year} เป็นยอดประมาณการ แก้ไขยอดจริงได้เฉพาะปี ${data.year}` }),
     wrap,
@@ -75,19 +77,15 @@ function view(data, name) {
 
 function content(data, group, year, sel, checked, onSelect) {
   const monthly = groupMonths(group, year, data.year);
-  const report = buildReport(data, year);
   const rows = group.items.map((item) => ({ item, months: itemMonths(item, year, data.year) }));
   const pick = (arr) => (sel === 'all' ? sum(arr) : arr[sel]);
   const amountOf = (r) => pick(r.months);
   const period = sel === 'all' ? `ทั้งปี ${year}` : `${MONTHS[sel]} ${year}`;
   const isIncome = group.type === 'income';
-  const balance = pick(report.balance);
 
   return [
-    h('section', { class: 'grid grid-stats', 'aria-label': `สรุปหมวด ${period}` },
-      Stat({ label: 'รายรับรวม', value: pick(report.income), icon: 'arrow-down', accent: 'green', hint: period }),
+    h('section', { class: 'grid grid-stats grid-stats-2', 'aria-label': `สรุปหมวด ${period}` },
       Stat({ label: isIncome ? 'รายรับหมวดนี้' : 'รายจ่ายหมวดนี้', value: pick(monthly), icon: isIncome ? 'arrow-down-left' : 'arrow-up', accent: isIncome ? 'green' : 'red', hint: period }),
-      Stat({ label: 'คงเหลือสุทธิ', value: balance, icon: 'wallet2', accent: 'blue', tone: balance < 0 ? 'neg' : null, hint: 'หลังหักรายจ่ายทุกหมวด' }),
       Stat({ label: 'จำนวนรายการ', value: group.items.length, unit: 'รายการ', icon: 'file-earmark-text', accent: 'purple' })),
     MonthChips(sel, onSelect),
     group.items.length === 0
@@ -123,12 +121,34 @@ function itemsCard(data, group, rows, sel, monthly, checked, amountOf) {
       },
     }));
 
+  // Checkboxes stay hidden until the user enters selection mode with the "เลือก" button
+  const toggleRow = (row) => {
+    if (checked.has(row)) checked.delete(row);
+    else checked.add(row);
+    sync();
+  };
+  const isSelecting = () => card.classList.contains('is-selecting');
+  function setSelecting(on) {
+    selectingByGroup[group.name] = on;
+    if (!on) checked.clear();
+    card.classList.toggle('is-selecting', on);
+    sync();
+    const focusTarget = on ? card.querySelector('.toolbar-select .row-check') : enterBtn;
+    if (focusTarget) focusTarget.focus();
+  }
+
   const countText = h('span', { class: 'sel-count', 'aria-live': 'polite' });
-  const deleteBtn = Button({ label: 'ลบรายการที่เลือก', icon: 'trash', variant: 'secondary', onClick: () => deleteChecked(group, checked) });
+  const deleteBtn = Button({ label: 'ลบรายการที่เลือก', icon: 'trash', variant: 'danger-ghost', className: 'sel-only btn-pill', onClick: () => deleteChecked(group, checked) });
+  const enterBtn = Button({ label: 'เลือก', icon: 'list-checks', variant: 'ghost', className: 'idle-only btn-pill btn-select', onClick: () => setSelecting(true) });
+  const exitBtn = Button({ label: 'ยกเลิก', icon: 'x-lg', variant: 'ghost', className: 'sel-only btn-pill', onClick: () => setSelecting(false) });
   const toolbar = h('div', { class: 'table-toolbar' },
-    h('div', { class: 'toolbar-select' }, selectAll('เลือกทั้งหมด'), countText),
-    h('span', { class: 'toolbar-sep', 'aria-hidden': 'true' }),
-    deleteBtn);
+    h('div', { class: 'toolbar-select sel-only' }, selectAll('เลือกทั้งหมด'), countText),
+    h('span', { class: 'toolbar-sep sel-only', 'aria-hidden': 'true' }),
+    deleteBtn,
+    h('p', { class: 'toolbar-total idle-only muted' }, `${group.items.length} รายการ`),
+    h('span', { class: 'toolbar-spacer', 'aria-hidden': 'true' }),
+    enterBtn,
+    exitBtn);
 
   // Updates checkboxes in place so focus and scroll position are kept
   function sync() {
@@ -158,7 +178,10 @@ function itemsCard(data, group, rows, sel, monthly, checked, amountOf) {
         h('th', { scope: 'col' }, 'ช่วงเวลา'))),
       h('tbody', {}, rows.map((r) => h('tr', { class: checked.has(r.item.row) ? 'is-selected' : null },
         h('td', { class: 'col-check' }, rowCheck(r.item)),
-        h('th', { scope: 'row' }, h('button', { type: 'button', class: 'link-btn', onClick: () => openItem(data, group, r.item) }, displayName(r.item))),
+        h('th', { scope: 'row' }, h('button', {
+          type: 'button', class: 'link-btn',
+          onClick: () => (isSelecting() ? toggleRow(r.item.row) : openItem(data, group, r.item)),
+        }, displayName(r.item))),
         r.months.map((v, i) => h('td', { class: selCls(i) }, v ? money(v) : '–')),
         h('td', { class: 'num' }, money(sum(r.months))),
         h('td', { class: 'nowrap muted' }, rangeText(r.item) || '–')))),
@@ -171,9 +194,10 @@ function itemsCard(data, group, rows, sel, monthly, checked, amountOf) {
 
   const list = LazyList(rows, (r) => h('div', { class: `select-row${checked.has(r.item.row) ? ' is-selected' : ''}` },
     rowCheck(r.item),
-    itemRow(r.item, amountOf(r), () => openItem(data, group, r.item))), { label: `รายการใน ${group.name}` });
+    itemRow(r.item, amountOf(r), () => (isSelecting() ? toggleRow(r.item.row) : openItem(data, group, r.item)))), { label: `รายการใน ${group.name}` });
 
   card.append(toolbar, h('div', { class: 'only-compact items-list' }, list), h('div', { class: 'only-wide' }, table));
+  card.classList.toggle('is-selecting', Boolean(selectingByGroup[group.name]));
   sync();
   return card;
 }
