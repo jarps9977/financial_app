@@ -1276,6 +1276,42 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
   .month-tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 
+/* ---------- Custom checkbox ----------
+   iOS Safari ignores accent-color and paints an unchecked native box solid black in dark mode,
+   so every app checkbox is drawn the same way on all browsers */
+.bill-check,
+.row-check,
+.month-check-input {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  margin: 0;
+  border: 2px solid color-mix(in srgb, var(--text-2) 65%, transparent);
+  border-radius: 0.4rem;
+  background: var(--surface) center / 75% no-repeat;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.bill-check:hover,
+.row-check:hover,
+.month-check-input:hover { border-color: var(--teal-2); }
+.bill-check:checked,
+.row-check:checked,
+.month-check-input:checked {
+  border-color: var(--teal-2);
+  background-color: var(--teal-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 4.8' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.bill-check:indeterminate,
+.row-check:indeterminate {
+  border-color: var(--teal-2);
+  background-color: var(--teal-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8h8' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.bill-check:disabled,
+.row-check:disabled,
+.month-check-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
