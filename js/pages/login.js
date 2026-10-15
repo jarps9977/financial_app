@@ -1,5 +1,5 @@
 import { h } from '../utils/dom.js';
-import { getSettings, saveSettings, isValidApiUrl } from '../settings.js';
+import { getSettings, saveSettings, isValidApiUrl, setPin, clearPin, isValidPin, PIN_LENGTH } from '../settings.js';
 import { state, refresh } from '../store.js';
 import { navigate } from '../router.js';
 import { Button } from '../components/button.js';
@@ -23,6 +23,10 @@ function view() {
   const passField = Field({
     label: 'รหัสผ่าน (PASSCODE)', name: 'passcode', type: 'password', autocomplete: 'current-password', required: true,
   });
+  const pinField = Field({
+    label: `PIN (${PIN_LENGTH} หลัก)`, name: 'pin', type: 'password', inputmode: 'numeric', autocomplete: 'off',
+    maxlength: PIN_LENGTH, required: true, hint: 'ต้องใส่ทุกครั้งที่เปิดแอป',
+  });
   const submit = Button({ label: 'เข้าสู่ระบบ', type: 'submit', block: true, icon: 'box-arrow-in-right' });
 
   async function onSubmit(e) {
@@ -38,9 +42,15 @@ function view() {
       passField.setError('กรอกรหัสผ่าน');
       valid = false;
     } else passField.setError('');
+    const pin = pinField.input.value.trim();
+    if (!isValidPin(pin)) {
+      pinField.setError(`PIN ต้องเป็นตัวเลข ${PIN_LENGTH} หลัก`);
+      valid = false;
+    } else pinField.setError('');
     if (!valid) return;
 
     saveSettings({ apiUrl, passcode });
+    setPin(pin);
     const res = await runTask({
       title: 'กำลังเชื่อมต่อ...',
       text: 'โหลดข้อมูลจาก Google Sheets',
@@ -51,6 +61,12 @@ function view() {
       },
     });
     if (!res.ok) {
+      clearPin();
+      if (res.error.code === 'pin') {
+        pinField.input.value = '';
+        pinField.input.focus();
+        return;
+      }
       if (res.error.code === 'unauthorized' || res.error.code === 'locked') saveSettings({ passcode: '' });
       passField.input.focus();
       return;
@@ -63,5 +79,5 @@ function view() {
       h('img', { src: 'icons/app_icon.png', alt: '', class: 'login-logo', width: '72', height: '72', decoding: 'async' }),
       h('h2', { class: 'login-title' }, 'Ngern'),
       h('p', { class: 'muted login-sub' }, 'ติดตามรายรับรายจ่ายรายปี · บันทึกลง Google Sheets'),
-      h('form', { class: 'stack', novalidate: true, onSubmit }, urlField.el, passField.el, submit)));
+      h('form', { class: 'stack', novalidate: true, onSubmit }, urlField.el, passField.el, pinField.el, submit)));
 }

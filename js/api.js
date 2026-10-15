@@ -1,4 +1,4 @@
-import { getSettings, isValidApiUrl } from './settings.js';
+import { getSettings, getPin, isValidApiUrl } from './settings.js';
 
 const TIMEOUT_MS = 25000;
 
@@ -37,7 +37,7 @@ export async function call(action, payload = {}, isValid = isValidData) {
     res = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ ...payload, action, key: passcode }),
+      body: JSON.stringify({ ...payload, action, key: passcode, pin: getPin() }),
       credentials: 'omit',
       cache: 'no-store',
       redirect: 'follow',

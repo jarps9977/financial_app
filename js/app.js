@@ -1,7 +1,7 @@
 import { h, toNodes } from './utils/dom.js';
 import { route, match, navigate, currentPath, groupPath } from './router.js';
 import { state, subscribe, refresh } from './store.js';
-import { getSettings, saveSettings, applyTheme, isConfigured } from './settings.js';
+import { getSettings, saveSettings, applyTheme, isConfigured, isUnlocked, clearPin, lock } from './settings.js';
 import { createShell } from './layout/shell.js';
 import { openSheet } from './components/bottom-sheet.js';
 import { ErrorState } from './components/states.js';
@@ -12,6 +12,7 @@ import { icon } from './components/icon.js';
 
 // Pages are lazy loaded so each route ships only its own code
 route('/login', () => import('./pages/login.js'));
+route('/pin', () => import('./pages/pin.js'));
 route('/', () => import('./pages/home.js'));
 route('/groups', () => import('./pages/groups.js'));
 route('/group/:name', () => import('./pages/group.js'));
@@ -32,10 +33,24 @@ attachPullToRefresh(() => refresh({ fresh: true }));
 
 let current = null;
 let renderToken = 0;
+// Hidden longer than this asks for the PIN again
+const AUTO_LOCK_MS = 5 * 60 * 1000;
+const OPEN_PATHS = ['/login', '/pin'];
+
+function lockApp() {
+  clearPin();
+  shell.setGroups({ groups: [] });
+  // Sheets and alerts would otherwise stay on top of the lock screen
+  document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+  if (window.Swal) window.Swal.close();
+  if (!OPEN_PATHS.includes(currentPath())) lock.returnTo = currentPath();
+  navigate('/pin');
+}
 
 async function renderRoute() {
   const path = currentPath();
   if (path !== '/login' && !isConfigured()) { navigate('/login'); return; }
+  if (!OPEN_PATHS.includes(path) && !isUnlocked()) { lock.returnTo = path; navigate('/pin'); return; }
   const found = match(path);
   if (!found) { navigate('/'); return; }
 
@@ -80,10 +95,17 @@ function paint() {
 
 subscribe((s) => {
   shell.setLoading(s.loading);
-  if (s.data) shell.setGroups(s.data);
-  if (s.error && s.error.code === 'unauthorized' && currentPath() !== '/login') {
+  const code = s.error && s.error.code;
+  // Never fill the sidebar while locked or while the PIN is being rejected
+  if (s.data && isUnlocked() && !['pin', 'locked', 'unauthorized'].includes(code)) shell.setGroups(s.data);
+  if (code === 'unauthorized' && !OPEN_PATHS.includes(currentPath())) {
     saveSettings({ passcode: '' });
+    clearPin();
     navigate('/login');
+    return;
+  }
+  if ((code === 'pin' || code === 'locked') && !OPEN_PATHS.includes(currentPath())) {
+    lockApp();
     return;
   }
   if (current && (current.mod.live !== false || !current.painted)) paint();
@@ -115,10 +137,19 @@ function openAddPicker() {
   });
 }
 
-if (state.data) shell.setGroups(state.data);
+if (state.data && isUnlocked()) shell.setGroups(state.data);
 window.addEventListener('hashchange', renderRoute);
 renderRoute();
-if (isConfigured()) refresh();
+if (isConfigured() && isUnlocked()) refresh();
+
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    hiddenAt = Date.now();
+  } else if (hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS && isUnlocked()) {
+    lockApp();
+  }
+});
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => { /* offline shell is optional */ });

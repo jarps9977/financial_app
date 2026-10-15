@@ -1,5 +1,5 @@
 import { h } from '../utils/dom.js';
-import { getSettings, saveSettings, applyTheme, isValidApiUrl } from '../settings.js';
+import { getSettings, saveSettings, applyTheme, isValidApiUrl, clearPin, lock } from '../settings.js';
 import { state, refresh, clearData } from '../store.js';
 import { navigate } from '../router.js';
 import { Card } from '../components/card.js';
@@ -53,6 +53,12 @@ function view() {
     });
   }
 
+  function lockNow() {
+    clearPin();
+    lock.returnTo = '/';
+    navigate('/pin');
+  }
+
   async function logout() {
     const ok = await confirmAction({
       title: 'ออกจากระบบ?',
@@ -62,6 +68,7 @@ function view() {
     });
     if (!ok) return;
     saveSettings({ passcode: '' });
+    clearPin();
     clearData();
     navigate('/login');
   }
@@ -85,6 +92,8 @@ function view() {
     }),
     Card({
       title: 'บัญชี',
-      children: Button({ label: 'ออกจากระบบ', icon: 'box-arrow-right', variant: 'danger-ghost', block: true, onClick: logout }),
+      children: h('div', { class: 'stack' },
+        Button({ label: 'ล็อกแอปตอนนี้', icon: 'lock', variant: 'secondary', block: true, onClick: lockNow }),
+        Button({ label: 'ออกจากระบบ', icon: 'box-arrow-right', variant: 'danger-ghost', block: true, onClick: logout })),
     }));
 }

@@ -10,7 +10,8 @@
  * Setup:
  * 1. Spreadsheet > Extensions > Apps Script, paste this file as Code.gs
  * 2. Project Settings > Script properties:
- *    PASSCODE (required, 12+ characters), YEAR (optional, defaults to current year)
+ *    PASSCODE (required, 12+ characters), PIN (8 digits, asked every time the app opens),
+ *    YEAR (optional, defaults to current year)
  * 3. Deploy > New deployment > Web app: Execute as "Me", Who has access "Anyone"
  *    (update: Manage deployments > Edit > Version: New version, keeps the same /exec URL)
  */
@@ -45,6 +46,7 @@ const TYPES = ['expense', 'income'];
 const BILLING_MODES = ['', 'combined', 'separate'];
 const MONTH_NAMES = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+const PIN_PATTERN = /^\d{8}$/;
 const YM_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 // Characters Sheets rejects in tab names; leading underscore is reserved for app metadata
 const GROUP_NAME_PATTERN = /^[^_\[\]*?\/\\:'][^\[\]*?\/\\:']*$/;
@@ -60,7 +62,7 @@ function doPost(e) {
     return reply_({ ok: false, error: 'คำขอไม่ถูกต้อง', code: 'bad_request' });
   }
 
-  const authError = authorize_(req.key);
+  const authError = authorize_(req.key, req.pin);
   if (authError) return reply_(authError);
 
   const handlers = {
@@ -108,17 +110,29 @@ function reply_(obj) {
 
 // ---------- Auth ----------
 
-function authorize_(key) {
+// Both the device passcode and the 8-digit PIN must match; failures share one lockout counter
+function authorize_(key, pin) {
   const cache = CacheService.getScriptCache();
   const fails = Number(cache.get('auth_fails') || 0);
   if (fails >= CONFIG.MAX_AUTH_FAILS) {
     return { ok: false, error: 'ใส่รหัสผิดหลายครั้ง กรุณารอ 10 นาที', code: 'locked' };
   }
-  const expected = PropertiesService.getScriptProperties().getProperty('PASSCODE');
+  const props = PropertiesService.getScriptProperties();
+  const expected = props.getProperty('PASSCODE');
   if (!expected) return { ok: false, error: 'ยังไม่ได้ตั้งค่า PASSCODE ใน Script properties', code: 'config' };
-  if (!safeEqual_(typeof key === 'string' ? key : '', expected)) {
+  const expectedPin = String(props.getProperty('PIN') || '').trim();
+  // Fail closed: a missing or malformed PIN property blocks every request
+  if (!PIN_PATTERN.test(expectedPin)) {
+    return { ok: false, error: 'ตั้งค่า PIN ใน Script properties เป็นตัวเลข 8 หลัก', code: 'config' };
+  }
+  const fail = (error, code) => {
     cache.put('auth_fails', String(fails + 1), CONFIG.AUTH_FAIL_WINDOW_SEC);
-    return { ok: false, error: 'รหัสผ่านไม่ถูกต้อง', code: 'unauthorized' };
+    return { ok: false, error: error, code: code };
+  };
+  if (!safeEqual_(typeof key === 'string' ? key : '', expected)) return fail('รหัสผ่านไม่ถูกต้อง', 'unauthorized');
+  if (!safeEqual_(typeof pin === 'string' ? pin : '', expectedPin)) {
+    const left = CONFIG.MAX_AUTH_FAILS - fails - 1;
+    return fail(left > 0 ? 'PIN ไม่ถูกต้อง (เหลือ ' + left + ' ครั้ง)' : 'ใส่ PIN ผิดหลายครั้ง กรุณารอ 10 นาที', left > 0 ? 'pin' : 'locked');
   }
   return null;
 }

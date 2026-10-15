@@ -1,5 +1,5 @@
 // Bump on every deploy so old shells are dropped
-const VERSION = 'ngern-v38';
+const VERSION = 'ngern-v39';
 
 const SHELL = [
   './',
@@ -43,6 +43,7 @@ const SHELL = [
   'js/pages/bills.js',
   'js/pages/import.js',
   'js/pages/login.js',
+  'js/pages/pin.js',
   'js/pages/settings.js',
 ];
 
