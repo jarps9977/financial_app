@@ -6,6 +6,7 @@ import { Button } from '../components/button.js';
 import { Field } from '../components/input.js';
 import { runTask, notify, confirmAction } from '../components/alert.js';
 import { icon } from '../components/icon.js';
+import { isCombinedBilling } from '../selectors.js';
 
 const MAX_NAME = 40;
 // Mirrors Apps Script GROUP_NAME_PATTERN (Sheets tab name rules)
@@ -69,9 +70,29 @@ export function openGroupMenu(group) {
     });
     if (ok) navigate('/groups');
   }
+
+  // Bills page mode: one combined bill (credit cards) or item by item
+  const combined = isCombinedBilling(group);
+  async function toggleBilling() {
+    ref.close();
+    await runTask({
+      title: 'กำลังบันทึก...',
+      task: () => mutate('setGroupBilling', { name: group.name, billing: combined ? 'separate' : 'combined' }),
+      success: 'บันทึกแล้ว',
+      successText: combined
+        ? `หน้าต้องจ่ายจะแสดง ${group.name} แยกทีละรายการ`
+        : `หน้าต้องจ่ายจะรวม ${group.name} เป็นบิลเดียว`,
+    });
+  }
+
   const ref = openSheet({
     title: group.name,
     content: h('ul', { class: 'pick-list' },
+      group.type === 'expense' && h('li', {}, h('button', { type: 'button', class: 'list-item', onClick: toggleBilling },
+        h('span', { class: 'list-item-icon' }, icon(combined ? 'list-ul' : 'credit-card-2-front')),
+        h('span', { class: 'list-item-main' },
+          h('span', { class: 'list-item-title' }, combined ? 'แยกทีละรายการในหน้าต้องจ่าย' : 'รวมเป็นบิลเดียว (บัตรเครดิต)'),
+          h('span', { class: 'list-item-sub' }, `ตอนนี้: ${combined ? 'รวมเป็นบิลเดียว' : 'แยกทีละรายการ'}`)))),
       h('li', {}, h('a', { class: 'list-item', href: `#${groupPath(group.name)}`, onClick: () => ref.close() },
         h('span', { class: 'list-item-icon' }, icon('list-ul')),
         h('span', { class: 'list-item-main' }, h('span', { class: 'list-item-title' }, 'ดูรายการ')))),

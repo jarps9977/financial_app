@@ -82,6 +82,43 @@ export function billsFor(data, year, month) {
   })).filter((b) => b.amount);
 }
 
+// Credit-card style groups are paid as one bill; 'combined'/'separate' override the name-based guess
+const CARD_NAME = /ktc|card|choice|visa|master|amex|uob|citi|บัตร/i;
+export function isCombinedBilling(group) {
+  if (group.billing === 'combined') return true;
+  if (group.billing === 'separate') return false;
+  return CARD_NAME.test(group.name);
+}
+
+// Bills grouped for display: combined groups become one entry holding their items
+export function billEntries(data, year, month) {
+  const bills = billsFor(data, year, month);
+  const combined = new Set(expenseGroups(data).filter(isCombinedBilling).map((g) => g.name));
+  const entries = [];
+  const byGroup = new Map();
+  bills.forEach((b) => {
+    if (!combined.has(b.group)) {
+      entries.push({ key: `item:${b.group}:${b.item.row}`, kind: 'item', group: b.group, name: b.item.name || '(ไม่มีชื่อ)', amount: b.amount, paid: b.paid, paidAt: b.paidAt, items: [b] });
+      return;
+    }
+    if (!byGroup.has(b.group)) {
+      const entry = { key: `group:${b.group}`, kind: 'group', group: b.group, name: b.group, amount: 0, items: [] };
+      byGroup.set(b.group, entry);
+      entries.push(entry);
+    }
+    const entry = byGroup.get(b.group);
+    entry.items.push(b);
+    entry.amount = round2(entry.amount + b.amount);
+  });
+  byGroup.forEach((entry) => {
+    entry.paidCount = entry.items.filter((b) => b.paid).length;
+    entry.paid = entry.paidCount === entry.items.length;
+    entry.partial = entry.paidCount > 0 && !entry.paid;
+    entry.paidAt = entry.paid ? entry.items.map((b) => b.paidAt).sort().pop() : '';
+  });
+  return entries;
+}
+
 export function availableYears(data) {
   const sy = data.year;
   let min = sy;

@@ -1,7 +1,7 @@
 import { h } from '../utils/dom.js';
 import { money, sum, MONTHS, MONTHS_SHORT, todayYm, ymKey } from '../utils/format.js';
 import { groupPath } from '../router.js';
-import { buildReport, availableYears, incomeGroups, expenseGroups, itemMonths, groupMonths, billsFor } from '../selectors.js';
+import { buildReport, availableYears, incomeGroups, expenseGroups, itemMonths, groupMonths, billsFor, billEntries } from '../selectors.js';
 import { Card } from '../components/card.js';
 import { Button } from '../components/button.js';
 import { Notice, PillLink, PageHero, MonthSwitch, kv } from '../components/misc.js';
@@ -174,10 +174,12 @@ function timelineCard(series, current, today, go) {
 function outstandingCard(data) {
   const now = todayYm();
   const next = shift(now, 1);
-  const bills = billsFor(data, now.y, now.m);
+  // Entries: credit-card groups count as one bill; amounts still sum per item
+  const bills = billEntries(data, now.y, now.m);
   const unpaid = bills.filter((b) => !b.paid).sort((a, b) => b.amount - a.amount);
-  const total = sum(bills.map((b) => b.amount));
-  const remaining = sum(unpaid.map((b) => b.amount));
+  const items = bills.flatMap((e) => e.items);
+  const total = sum(items.map((b) => b.amount));
+  const remaining = sum(items.filter((b) => !b.paid).map((b) => b.amount));
   const paid = total - remaining;
   const nextTotal = sum(billsFor(data, next.y, next.m).map((b) => b.amount));
   const monthName = MONTHS[now.m - 1];
@@ -212,8 +214,13 @@ function outstandingCard(data) {
             const look = lookOf(b.group);
             return h('li', {}, h('a', { class: `mini-row tone-${look.tone}`, href: '#/bills' },
               h('span', { class: 'bill-icon', 'aria-hidden': 'true' }, icon(look.icon)),
-              h('span', { class: 'mini-main' }, h('span', { class: 'mini-title' }, b.item.name || '(ไม่มีชื่อ)'), h('span', { class: 'muted' }, b.group)),
-              h('span', { class: 'mini-side num' }, money(b.amount))));
+              h('span', { class: 'mini-main' },
+                h('span', { class: 'mini-title' }, b.name),
+                h('span', { class: 'muted' }, b.kind === 'group'
+                  ? `บิลบัตร · ${b.items.length} รายการ${b.partial ? ` · จ่ายแล้ว ${b.paidCount}` : ''}`
+                  : b.group)),
+              // A partly paid card bill shows what is still owed
+              h('span', { class: 'mini-side num' }, money(sum(b.items.filter((x) => !x.paid).map((x) => x.amount))))));
           }),
           unpaid.length > 4 && h('li', { class: 'muted outstanding-more' }, `และอีก ${unpaid.length - 4} รายการ`)))
       : Empty({ icon: 'inbox', title: 'เดือนนี้ไม่มีรายการที่ต้องจ่าย', compact: true }),

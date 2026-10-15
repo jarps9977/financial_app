@@ -42,6 +42,7 @@ const CONFIG = {
 
 const LAST_COL = CONFIG.AMOUNT_COL;
 const TYPES = ['expense', 'income'];
+const BILLING_MODES = ['', 'combined', 'separate'];
 const MONTH_NAMES = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const YM_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -82,6 +83,7 @@ function doPost(e) {
     }),
     createGroup: () => writePatch_(ss => ({ added: [createGroup_(ss, req)] })),
     removeGroup: () => writePatch_(ss => ({ removed: [removeGroup_(ss, req)] })),
+    setGroupBilling: () => writePatch_(ss => ({ changed: [setGroupBilling_(ss, req)] })),
   };
   if (typeof req.action !== 'string' || !Object.prototype.hasOwnProperty.call(handlers, req.action)) {
     return reply_({ ok: false, error: 'ไม่รู้จักคำสั่ง', code: 'bad_request' });
@@ -151,7 +153,7 @@ function writePatch_(fn) {
     const readGroups = names => (names || []).map(name => {
       const g = list.find(x => x.name === name);
       const sh = g && ss.getSheetByName(name);
-      return sh ? { name: name, type: g.type, items: readItems_(sh, tz) } : null;
+      return sh ? { name: name, type: g.type, billing: g.billing, items: readItems_(sh, tz) } : null;
     }).filter(Boolean);
     return {
       partial: true,
@@ -188,8 +190,14 @@ function ensureConfig_(ss) {
 function readGroupList_(ss) {
   const sh = ss.getSheetByName(CONFIG.CONFIG_SHEET);
   if (!sh || sh.getLastRow() < 2) return [];
-  return sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues()
-    .map((r, i) => ({ name: String(r[0]).trim(), type: String(r[1]).trim(), configRow: i + 2 }))
+  // Column C is the billing mode for the bills page: '' (auto), 'combined' or 'separate'
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues()
+    .map((r, i) => ({
+      name: String(r[0]).trim(),
+      type: String(r[1]).trim(),
+      billing: BILLING_MODES.indexOf(String(r[2]).trim()) !== -1 ? String(r[2]).trim() : '',
+      configRow: i + 2,
+    }))
     .filter(g => g.name && TYPES.indexOf(g.type) !== -1);
 }
 
@@ -264,7 +272,7 @@ function read_(ss) {
       missing.push(g.name);
       return;
     }
-    groups.push({ name: g.name, type: g.type, items: readItems_(sh, tz) });
+    groups.push({ name: g.name, type: g.type, billing: g.billing, items: readItems_(sh, tz) });
   });
   return {
     year: sheetYear_(),
@@ -459,14 +467,20 @@ function ensurePaidSheet_(ss) {
   return sh;
 }
 
-// Marks one item as paid (or not) for a month; the item name guards against a reused sheet row
+// Marks items of one group as paid (or not) for a month: either { row, name } or items: [{ row, name }]
+// (a combined credit-card bill ticks all its items at once). The name guards against a reused sheet row.
 function setPaid_(ss, req) {
   const ym = validYm_(req.ym, 'เดือน');
   if (!ym) throw userError_('ต้องระบุเดือน');
   if (groupNames_(ss).indexOf(req.group) === -1) throw userError_('หมวดไม่ถูกต้อง');
-  const row = validRow_(req.row);
-  const name = typeof req.name === 'string' ? req.name.trim() : '';
-  if (name.length > CONFIG.MAX_NAME) throw userError_('ชื่อรายการยาวเกินไป');
+  const raw = Array.isArray(req.items) ? req.items : [{ row: req.row, name: req.name }];
+  if (raw.length === 0 || raw.length > CONFIG.MAX_BATCH) throw userError_('จำนวนรายการไม่ถูกต้อง');
+  const targets = raw.map(it => {
+    const name = it && typeof it.name === 'string' ? it.name.trim() : '';
+    if (name.length > CONFIG.MAX_NAME) throw userError_('ชื่อรายการยาวเกินไป');
+    return { row: validRow_(it && it.row), name: name };
+  });
+  const rows = targets.map(t => t.row);
   const paid = req.paid === true;
 
   const sh = ensurePaidSheet_(ss);
@@ -476,14 +490,16 @@ function setPaid_(ss, req) {
     const values = sh.getRange(2, 1, last - 1, 3).getValues();
     // Bottom-up so deleting rows does not shift the ones still to check
     for (let i = values.length - 1; i >= 0; i--) {
-      if (normYm_(values[i][0], tz) === ym && String(values[i][1]).trim() === req.group && Number(values[i][2]) === row) {
+      if (normYm_(values[i][0], tz) === ym && String(values[i][1]).trim() === req.group && rows.indexOf(Number(values[i][2])) !== -1) {
         sh.deleteRow(i + 2);
       }
     }
   }
   if (!paid) return;
-  if (sh.getLastRow() > CONFIG.MAX_PAID_ROWS) throw userError_('ประวัติการจ่ายเต็มแล้ว');
-  sh.appendRow([ym, req.group, row, safeText_(name), new Date()]);
+  if (sh.getLastRow() + targets.length > CONFIG.MAX_PAID_ROWS) throw userError_('ประวัติการจ่ายเต็มแล้ว');
+  const now = new Date();
+  sh.getRange(sh.getLastRow() + 1, 1, targets.length, 5)
+    .setValues(targets.map(t => [ym, req.group, t.row, safeText_(t.name), now]));
 }
 
 // ---------- Write: groups ----------
@@ -509,6 +525,18 @@ function removeGroup_(ss, req) {
   const g = readGroupList_(ss).find(x => x.name === req.name);
   if (!g) throw userError_('ไม่พบหมวดนี้', 'conflict');
   ss.getSheetByName(CONFIG.CONFIG_SHEET).deleteRow(g.configRow);
+  return g.name;
+}
+
+// Whether the bills page shows the group as one combined bill (credit cards) or item by item
+function setGroupBilling_(ss, req) {
+  if (BILLING_MODES.indexOf(req.billing) === -1) throw userError_('รูปแบบการจ่ายไม่ถูกต้อง');
+  const g = readGroupList_(ss).find(x => x.name === req.name);
+  if (!g) throw userError_('ไม่พบหมวดนี้', 'conflict');
+  const cfg = ss.getSheetByName(CONFIG.CONFIG_SHEET);
+  const header = cfg.getRange(1, 3);
+  if (header.isBlank()) header.setValue('billing');
+  cfg.getRange(g.configRow, 3).setNumberFormat('@').setValue(req.billing);
   return g.name;
 }
 
