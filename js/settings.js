@@ -37,38 +37,31 @@ export function isValidApiUrl(url) {
   }
 }
 
-// PIN lives only in sessionStorage/memory so reopening the app always asks for it again
+// PIN lives only in this session (memory + sessionStorage for reloads), so reopening the app asks again
 const PIN_KEY = 'ngern.pin';
 export const PIN_LENGTH = 8;
-let pinMemory = '';
-// Route to return to after unlocking
-export const lock = { returnTo: '/' };
-
-export const isValidPin = (pin) => typeof pin === 'string' && /^\d{8}$/.test(pin);
-
-export function getPin() {
+const PIN_PATTERN = new RegExp(`^\\d{${PIN_LENGTH}}$`);
+let pin = (() => {
   try {
-    return sessionStorage.getItem(PIN_KEY) || pinMemory;
+    return sessionStorage.getItem(PIN_KEY) || '';
   } catch {
-    return pinMemory;
+    return '';
   }
-}
+})();
 
-export function setPin(pin) {
-  pinMemory = pin;
+export const isValidPin = (value) => typeof value === 'string' && PIN_PATTERN.test(value);
+export const getPin = () => pin;
+export const isUnlocked = () => isValidPin(pin);
+
+export function setPin(value) {
+  pin = value;
   try {
-    sessionStorage.setItem(PIN_KEY, pin);
+    if (value) sessionStorage.setItem(PIN_KEY, value);
+    else sessionStorage.removeItem(PIN_KEY);
   } catch { /* memory only */ }
 }
 
-export function clearPin() {
-  pinMemory = '';
-  try {
-    sessionStorage.removeItem(PIN_KEY);
-  } catch { /* ignore */ }
-}
-
-export const isUnlocked = () => isValidPin(getPin());
+export const clearPin = () => setPin('');
 
 export function isConfigured() {
   const s = getSettings();

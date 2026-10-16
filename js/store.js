@@ -49,9 +49,10 @@ export function setGroupYear(year) {
 }
 
 // Resolves even on failure; callers read state.error.
-// fresh=true skips the server-side load cache (used by the refresh button and pull-to-refresh)
-export function refresh({ fresh = false } = {}) {
-  if (inflight) return inflight;
+// fresh=true skips the server-side load cache (used by the refresh button and pull-to-refresh).
+// force=true waits for any in-flight load and sends a new one (credentials may have changed since).
+export function refresh({ fresh = false, force = false } = {}) {
+  if (inflight) return force ? inflight.then(() => refresh({ fresh })) : inflight;
   state.loading = true;
   state.error = null;
   emit();

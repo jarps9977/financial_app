@@ -1,7 +1,7 @@
 import { h } from '../utils/dom.js';
-import { getSettings, saveSettings, applyTheme, isValidApiUrl, clearPin, lock } from '../settings.js';
-import { state, refresh, clearData } from '../store.js';
-import { navigate } from '../router.js';
+import { getSettings, saveSettings, applyTheme, isValidApiUrl } from '../settings.js';
+import { state, refresh } from '../store.js';
+import { lockApp, signOut } from '../session.js';
 import { Card } from '../components/card.js';
 import { Button } from '../components/button.js';
 import { Field } from '../components/input.js';
@@ -53,12 +53,6 @@ function view() {
     });
   }
 
-  function lockNow() {
-    clearPin();
-    lock.returnTo = '/';
-    navigate('/pin');
-  }
-
   async function logout() {
     const ok = await confirmAction({
       title: 'ออกจากระบบ?',
@@ -67,10 +61,7 @@ function view() {
       danger: true,
     });
     if (!ok) return;
-    saveSettings({ passcode: '' });
-    clearPin();
-    clearData();
-    navigate('/login');
+    signOut();
   }
 
   return h('div', { class: 'grid grid-2' },
@@ -93,7 +84,7 @@ function view() {
     Card({
       title: 'บัญชี',
       children: h('div', { class: 'stack' },
-        Button({ label: 'ล็อกแอปตอนนี้', icon: 'lock', variant: 'secondary', block: true, onClick: lockNow }),
+        Button({ label: 'ล็อกแอปตอนนี้', icon: 'lock', variant: 'secondary', block: true, onClick: () => lockApp('/') }),
         Button({ label: 'ออกจากระบบ', icon: 'box-arrow-right', variant: 'danger-ghost', block: true, onClick: logout })),
     }));
 }

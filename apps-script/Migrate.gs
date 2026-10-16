@@ -60,17 +60,14 @@ function runMigration() {
     const temp = ss.getSheetByName(MIGRATION.TEMP_SHEET) || ss.insertSheet(MIGRATION.TEMP_SHEET);
     ss.setActiveSheet(temp);
 
-    let cfg = ss.getSheetByName(CONFIG.CONFIG_SHEET);
     const doomed = readGroupList_(ss).map(g => g.name).concat(groups.map(g => g.name));
     doomed.forEach(name => {
       const sh = ss.getSheetByName(name);
-      if (sh && name.charAt(0) !== '_') ss.deleteSheet(sh);
+      if (sh) ss.deleteSheet(sh);
     });
 
-    if (!cfg) {
-      cfg = ss.insertSheet(CONFIG.CONFIG_SHEET);
-      cfg.hideSheet();
-    }
+    const cfg = ss.getSheetByName(CONFIG.CONFIG_SHEET) || ss.insertSheet(CONFIG.CONFIG_SHEET);
+    cfg.hideSheet();
     cfg.clearContents();
     const paid = ss.getSheetByName(CONFIG.PAID_SHEET);
     if (paid && paid.getLastRow() >= 2) paid.getRange(2, 1, paid.getLastRow() - 1, 5).clearContent();
@@ -161,19 +158,24 @@ function planItem_(row, layout, year, tz, rowNumber) {
 
   const months = [];
   for (let m = 0; m < 12; m++) months.push(cellAmount_(row[CONFIG.FIRST_MONTH_COL - 1 + m]));
-  const filled = months.map((v, m) => (v !== null && v !== 0 ? m : -1)).filter(m => m !== -1);
+  // null and 0 both mean no amount that month
+  const filled = [];
+  months.forEach((v, m) => { if (v) filled.push(m); });
   if (filled.length === 0) return null;
   if (!name) name = 'รายการแถว ' + rowNumber;
 
   const ym = m => year + '-' + String(m + 1).padStart(2, '0');
-  let start = '';
-  let end = '';
   const srcEnd = layout.endCol ? normYm_(row[layout.endCol - 1], tz) : '';
   const srcStart = layout.startCol ? normYm_(row[layout.startCol - 1], tz) : '';
+  let start = '';
+  let end = '';
+  // All 12 months with no explicit end = runs forever (no start/end)
   if (filled.length < 12 || srcEnd) {
-    start = srcStart || ym(filled[0]);
-    end = srcEnd || ym(filled[filled.length - 1]);
-    if (start > end) start = ym(filled[0]) <= end ? ym(filled[0]) : '';
+    // Source start/end only widen the range; a stale value can never cut off filled months
+    const firstYm = ym(filled[0]);
+    const lastYm = ym(filled[filled.length - 1]);
+    end = srcEnd > lastYm ? srcEnd : lastYm;
+    start = srcStart && srcStart < firstYm ? srcStart : firstYm;
   }
 
   return {

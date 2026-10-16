@@ -117,10 +117,11 @@ function authorize_(key, pin) {
   if (fails >= CONFIG.MAX_AUTH_FAILS) {
     return { ok: false, error: 'ใส่รหัสผิดหลายครั้ง กรุณารอ 10 นาที', code: 'locked' };
   }
-  const props = PropertiesService.getScriptProperties();
-  const expected = props.getProperty('PASSCODE');
+  // One properties read per request instead of one per key
+  const props = PropertiesService.getScriptProperties().getProperties();
+  const expected = props.PASSCODE;
   if (!expected) return { ok: false, error: 'ยังไม่ได้ตั้งค่า PASSCODE ใน Script properties', code: 'config' };
-  const expectedPin = String(props.getProperty('PIN') || '').trim();
+  const expectedPin = String(props.PIN || '').trim();
   // Fail closed: a missing or malformed PIN property blocks every request
   if (!PIN_PATTERN.test(expectedPin)) {
     return { ok: false, error: 'ตั้งค่า PIN ใน Script properties เป็นตัวเลข 8 หลัก', code: 'config' };
@@ -132,8 +133,11 @@ function authorize_(key, pin) {
   if (!safeEqual_(typeof key === 'string' ? key : '', expected)) return fail('รหัสผ่านไม่ถูกต้อง', 'unauthorized');
   if (!safeEqual_(typeof pin === 'string' ? pin : '', expectedPin)) {
     const left = CONFIG.MAX_AUTH_FAILS - fails - 1;
-    return fail(left > 0 ? 'PIN ไม่ถูกต้อง (เหลือ ' + left + ' ครั้ง)' : 'ใส่ PIN ผิดหลายครั้ง กรุณารอ 10 นาที', left > 0 ? 'pin' : 'locked');
+    if (left <= 0) return fail('ใส่ PIN ผิดหลายครั้ง กรุณารอ 10 นาที', 'locked');
+    return fail('PIN ไม่ถูกต้อง (เหลือ ' + left + ' ครั้ง)', 'pin');
   }
+  // Earlier typos must not keep counting once the owner gets in
+  if (fails) cache.remove('auth_fails');
   return null;
 }
 

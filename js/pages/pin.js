@@ -1,18 +1,21 @@
 import { h } from '../utils/dom.js';
-import { saveSettings, setPin, clearPin, lock, PIN_LENGTH } from '../settings.js';
-import { state, refresh, clearData } from '../store.js';
+import { setPin, clearPin, PIN_LENGTH } from '../settings.js';
+import { state, refresh } from '../store.js';
 import { navigate } from '../router.js';
+import { signOut, unlockTarget } from '../session.js';
 import { icon } from '../components/icon.js';
+import { AuthHeader } from '../components/misc.js';
 
 export default {
   title: () => 'ใส่ PIN',
-  kind: 'bare',
+  kind: 'lock',
   live: false,
   needsData: false,
   render: () => view(),
 };
 
-let keyHandler = null;
+// Aborted on every render so only the visible keypad listens to the keyboard
+let keys = null;
 
 function view() {
   let pin = '';
@@ -33,14 +36,13 @@ function view() {
     dotRow.classList.add('is-busy');
     error.textContent = '';
     setPin(pin);
-    await refresh({ fresh: true });
+    // The server checks the PIN on every call, so the cached load is enough
+    await refresh({ force: true });
     busy = false;
     dotRow.classList.remove('is-busy');
     const err = state.error;
     if (!err) {
-      const target = lock.returnTo || '/';
-      lock.returnTo = '/';
-      navigate(target);
+      navigate(unlockTarget());
       return;
     }
     clearPin();
@@ -48,9 +50,7 @@ function view() {
     paint();
     if (err.code === 'unauthorized') {
       // Device passcode is no longer valid: sign in again from scratch
-      saveSettings({ passcode: '' });
-      clearData();
-      navigate('/login');
+      signOut();
       return;
     }
     error.textContent = err.message;
@@ -79,24 +79,18 @@ function view() {
     key('0', () => press('0')),
     key(icon('backspace'), back, { class: 'pin-key is-icon', 'aria-label': 'ลบตัวเลข' }));
 
-  // Physical keyboard support; replaced on every render so only one listener is active
-  if (keyHandler) document.removeEventListener('keydown', keyHandler);
-  keyHandler = (e) => {
-    if (!document.body.contains(keypad)) {
-      document.removeEventListener('keydown', keyHandler);
-      keyHandler = null;
-      return;
-    }
+  // Physical keyboard support
+  if (keys) keys.abort();
+  keys = new AbortController();
+  document.addEventListener('keydown', (e) => {
+    if (!keypad.isConnected) { keys.abort(); return; }
     if (/^\d$/.test(e.key)) press(e.key);
     else if (e.key === 'Backspace') back();
-  };
-  document.addEventListener('keydown', keyHandler);
+  }, { signal: keys.signal });
 
   paint();
   return h('div', { class: 'pin-screen' },
     h('div', { class: 'login-card card pin-card' },
-      h('img', { src: 'icons/app_icon.png', alt: '', class: 'login-logo', width: '72', height: '72', decoding: 'async' }),
-      h('h2', { class: 'login-title' }, 'ใส่ PIN'),
-      h('p', { class: 'muted login-sub' }, `PIN ${PIN_LENGTH} หลัก เพื่อเข้าใช้งาน`),
+      AuthHeader('ใส่ PIN', `PIN ${PIN_LENGTH} หลัก เพื่อเข้าใช้งาน`),
       dotRow, status, error, keypad));
 }

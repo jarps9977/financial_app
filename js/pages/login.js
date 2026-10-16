@@ -5,6 +5,7 @@ import { navigate } from '../router.js';
 import { Button } from '../components/button.js';
 import { Field } from '../components/input.js';
 import { runTask } from '../components/alert.js';
+import { AuthHeader } from '../components/misc.js';
 
 export default {
   title: () => 'เข้าสู่ระบบ',
@@ -56,7 +57,7 @@ function view() {
       text: 'โหลดข้อมูลจาก Google Sheets',
       success: 'เข้าสู่ระบบสำเร็จ',
       task: async () => {
-        await refresh();
+        await refresh({ force: true });
         if (state.error) throw state.error;
       },
     });
@@ -67,7 +68,8 @@ function view() {
         pinField.input.focus();
         return;
       }
-      if (res.error.code === 'unauthorized' || res.error.code === 'locked') saveSettings({ passcode: '' });
+      // 'locked' can come from PIN typos too, so only a rejected passcode clears it
+      if (res.error.code === 'unauthorized') saveSettings({ passcode: '' });
       passField.input.focus();
       return;
     }
@@ -76,8 +78,6 @@ function view() {
 
   return h('div', { class: 'login' },
     h('div', { class: 'login-card card' },
-      h('img', { src: 'icons/app_icon.png', alt: '', class: 'login-logo', width: '72', height: '72', decoding: 'async' }),
-      h('h2', { class: 'login-title' }, 'Ngern'),
-      h('p', { class: 'muted login-sub' }, 'ติดตามรายรับรายจ่ายรายปี · บันทึกลง Google Sheets'),
+      AuthHeader('Ngern', 'ติดตามรายรับรายจ่ายรายปี · บันทึกลง Google Sheets'),
       h('form', { class: 'stack', novalidate: true, onSubmit }, urlField.el, passField.el, pinField.el, submit)));
 }

@@ -104,3 +104,12 @@ export const SectionHead = (text, iconName, tone) => h('h2', { class: `section-h
   h('span', { class: 'section-icon', 'aria-hidden': 'true' }, icon(iconName)), text);
 
 export { toast } from './alert.js';
+
+// Logo, title and subtitle shared by the login and PIN screens
+export function AuthHeader(title, sub) {
+  return [
+    h('img', { src: 'icons/app_icon.png', alt: '', class: 'login-logo', width: '72', height: '72', decoding: 'async' }),
+    h('h2', { class: 'login-title' }, title),
+    h('p', { class: 'muted login-sub' }, sub),
+  ];
+}

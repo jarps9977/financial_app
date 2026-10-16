@@ -1,5 +1,5 @@
 // Bump on every deploy so old shells are dropped
-const VERSION = 'ngern-v41';
+const VERSION = 'ngern-v43';
 
 const SHELL = [
   './',
@@ -16,6 +16,7 @@ const SHELL = [
   'js/selectors.js',
   'js/settings.js',
   'js/store.js',
+  'js/session.js',
   'js/utils/dom.js',
   'js/utils/format.js',
   'js/utils/slip-parser.js',
@@ -47,6 +48,8 @@ const SHELL = [
   'js/pages/settings.js',
 ];
 
+const SHELL_URLS = new Set(SHELL.map((p) => new URL(p, self.location).href));
+
 // Versioned third-party assets (fonts, icons) never change, so cache first
 const CDN_ORIGINS = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'];
 
@@ -77,8 +80,16 @@ self.addEventListener('fetch', (e) => {
   }
   if (url.origin !== self.location.origin) return;
 
-  // Network first keeps deploys fresh; cache is the offline fallback.
-  // no-cache revalidates with the server so GitHub Pages' 10 min HTTP cache never mixes old CSS with new JS.
+  // Shell assets come from this version's cache: install fetched them together (cache: 'reload'),
+  // so CSS and JS always match and opening the app needs no per-file round trips.
+  // Any shell change must bump VERSION, which reinstalls the whole set.
+  if (req.mode !== 'navigate' && SHELL_URLS.has(url.href)) {
+    e.respondWith(caches.open(VERSION).then((c) => c.match(req))
+      .then((hit) => hit || fetch(req, { cache: 'no-cache' })));
+    return;
+  }
+
+  // Pages and anything outside the shell: network first, revalidated past GitHub Pages' 10 min HTTP cache
   e.respondWith(fetch(req, { cache: 'no-cache' }).then((res) => {
     if (res.ok) {
       const copy = res.clone();

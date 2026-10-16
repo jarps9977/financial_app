@@ -1,7 +1,8 @@
 import { h, toNodes } from './utils/dom.js';
 import { route, match, navigate, currentPath, groupPath } from './router.js';
 import { state, subscribe, refresh } from './store.js';
-import { getSettings, saveSettings, applyTheme, isConfigured, isUnlocked, clearPin, lock } from './settings.js';
+import { getSettings, applyTheme, isConfigured, isUnlocked, clearPin } from './settings.js';
+import { lockApp, signOut, isOpenPath } from './session.js';
 import { createShell } from './layout/shell.js';
 import { openSheet } from './components/bottom-sheet.js';
 import { ErrorState } from './components/states.js';
@@ -35,22 +36,18 @@ let current = null;
 let renderToken = 0;
 // No touch/keyboard input (or app in background) for this long asks for the PIN again
 const AUTO_LOCK_MS = 5 * 60 * 1000;
-const OPEN_PATHS = ['/login', '/pin'];
-
-function lockApp() {
-  clearPin();
-  shell.setGroups({ groups: [] });
-  // Sheets and alerts would otherwise stay on top of the lock screen
-  document.querySelectorAll('dialog[open]').forEach((d) => d.close());
-  if (window.Swal) window.Swal.close();
-  if (!OPEN_PATHS.includes(currentPath())) lock.returnTo = currentPath();
-  navigate('/pin');
-}
+let sidebarCleared = null;
 
 async function renderRoute() {
   const path = currentPath();
   if (path !== '/login' && !isConfigured()) { navigate('/login'); return; }
-  if (!OPEN_PATHS.includes(path) && !isUnlocked()) { lock.returnTo = path; navigate('/pin'); return; }
+  if (!isOpenPath(path) && !isUnlocked()) { lockApp(path); return; }
+  // Group names never sit in the DOM behind the login/PIN screens; rebuilt only when crossing that boundary
+  const open = isOpenPath(path);
+  if (open !== sidebarCleared) {
+    sidebarCleared = open;
+    shell.setGroups(!open && state.data ? state.data : { groups: [] });
+  }
   const found = match(path);
   if (!found) { navigate('/'); return; }
 
@@ -95,19 +92,12 @@ function paint() {
 
 subscribe((s) => {
   shell.setLoading(s.loading);
+  // Login/PIN pages handle their own auth errors
+  if (isOpenPath(currentPath())) return;
   const code = s.error && s.error.code;
-  // Never fill the sidebar while locked or while the PIN is being rejected
-  if (s.data && isUnlocked() && !['pin', 'locked', 'unauthorized'].includes(code)) shell.setGroups(s.data);
-  if (code === 'unauthorized' && !OPEN_PATHS.includes(currentPath())) {
-    saveSettings({ passcode: '' });
-    clearPin();
-    navigate('/login');
-    return;
-  }
-  if ((code === 'pin' || code === 'locked') && !OPEN_PATHS.includes(currentPath())) {
-    lockApp();
-    return;
-  }
+  if (code === 'unauthorized') { signOut(); return; }
+  if (code === 'pin' || code === 'locked') { lockApp(); return; }
+  if (s.data) shell.setGroups(s.data);
   if (current && (current.mod.live !== false || !current.painted)) paint();
 });
 
@@ -137,19 +127,39 @@ function openAddPicker() {
   });
 }
 
-if (state.data && isUnlocked()) shell.setGroups(state.data);
+// Idle lock: background time counts as idle because no input arrives while hidden.
+// Timers are throttled in the background, so the check also runs when the app becomes visible.
+// The last-activity time is kept in sessionStorage next to the PIN, so a reload or an iOS tab
+// discard does not restart the idle clock.
+const ACTIVE_KEY = 'ngern.active';
+let lastActive = (() => {
+  try {
+    return Number(sessionStorage.getItem(ACTIVE_KEY)) || Date.now();
+  } catch {
+    return Date.now();
+  }
+})();
+const markActive = () => {
+  const now = Date.now();
+  if (now - lastActive < 5000) return; // throttle storage writes
+  lastActive = now;
+  try {
+    sessionStorage.setItem(ACTIVE_KEY, String(now));
+  } catch { /* memory only */ }
+};
+// A session left idle past the limit starts locked, before anything renders or loads
+if (isUnlocked() && Date.now() - lastActive > AUTO_LOCK_MS) clearPin();
+lastActive = 0;
+markActive();
+
 window.addEventListener('hashchange', renderRoute);
 renderRoute();
 if (isConfigured() && isUnlocked()) refresh();
 
-// Idle lock: background time counts as idle because no input arrives while hidden.
-// Timers are throttled in the background, so the check also runs when the app becomes visible.
-let lastActive = Date.now();
-const markActive = () => { lastActive = Date.now(); };
 const checkIdle = () => {
   if (isUnlocked() && Date.now() - lastActive > AUTO_LOCK_MS) lockApp();
 };
-['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach((type) => {
+['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach((type) => {
   window.addEventListener(type, markActive, { passive: true, capture: true });
 });
 document.addEventListener('visibilitychange', () => {

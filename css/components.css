@@ -849,10 +849,8 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 
 /* ---------- Bills checklist ---------- */
 .bills-card .progress { margin-bottom: var(--space-3); }
-.bills-card { min-width: 0; max-width: 100%; }
 /* minmax(0,1fr) stops long names from widening the grid track past the card */
 .bill-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
-.bill-list li, .bill-group { min-width: 0; }
 .bill-row {
   display: flex;
   align-items: center;
@@ -1261,11 +1259,7 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 .login-title { text-align: center; font-size: var(--fs-xl); }
 .login-sub { text-align: center; font-size: var(--fs-sm); margin-bottom: var(--space-2); }
 
-/* PIN lock screen: pinned to the viewport, never scrolls or bounces */
-html:has(.pin-screen),
-html:has(.pin-screen) body { overflow: hidden; overscroll-behavior: none; height: 100%; min-height: 0; }
-/* Nothing in flow under the overlay, so iOS has no document height left to scroll */
-html:has(.pin-screen) .app-main { padding: 0; min-height: 0; }
+/* PIN lock screen (page kind "lock" in layout.css stops the document from scrolling) */
 .pin-screen {
   position: fixed;
   inset: 0;
@@ -1291,7 +1285,6 @@ html:has(.pin-screen) .app-main { padding: 0; min-height: 0; }
   /* Shrinks on short screens so the whole pad fits without scrolling */
   width: clamp(3rem, 9dvh, 4.25rem);
   height: clamp(3rem, 9dvh, 4.25rem);
-  -webkit-tap-highlight-color: transparent;
   user-select: none;
   border-radius: 50%;
   border: 1px solid var(--border);
@@ -1305,7 +1298,6 @@ html:has(.pin-screen) .app-main { padding: 0; min-height: 0; }
   transition: background-color 0.12s, transform 0.08s;
 }
 .pin-key:active { transform: scale(0.94); background: color-mix(in srgb, var(--teal-2) 20%, var(--surface-2)); }
-.pin-key:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .pin-key.is-icon { border-color: transparent; background: none; font-size: 1.4rem; color: var(--text-2); }
 @keyframes pin-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
 @keyframes pin-pulse { 50% { opacity: 0.4; } }
