@@ -40,6 +40,10 @@
   --stat-tint: 10%;
   --stat-glow: 18%;
 
+  /* Table row hover: opaque so sticky cells stay solid, accent line keeps it visible on tinted cells */
+  --row-hover: color-mix(in srgb, var(--teal) 14%, var(--surface));
+  --row-hover-line: color-mix(in srgb, var(--teal-2) 60%, transparent);
+
   --font: 'Noto Sans Thai', 'Sarabun', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --fs-xs: 0.75rem;
   --fs-sm: 0.875rem;
@@ -96,6 +100,8 @@
   --acc-purple: #c4b5fd;
   --stat-tint: 16%;
   --stat-glow: 30%;
+  --row-hover: color-mix(in srgb, var(--teal) 18%, var(--surface));
+  --row-hover-line: color-mix(in srgb, var(--teal) 70%, transparent);
     --scrim: rgb(0 0 0 / 0.6);
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5);
@@ -131,6 +137,8 @@
   --acc-purple: #c4b5fd;
   --stat-tint: 16%;
   --stat-glow: 30%;
+  --row-hover: color-mix(in srgb, var(--teal) 18%, var(--surface));
+  --row-hover-line: color-mix(in srgb, var(--teal) 70%, transparent);
   --scrim: rgb(0 0 0 / 0.6);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5);
