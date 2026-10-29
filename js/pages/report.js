@@ -83,7 +83,7 @@ function reportTable(r, cur) {
     h('table', { class: 'data report-table' },
       h('thead', {}, h('tr', {},
         h('th', { scope: 'col', class: 'col-idx' }, 'ลำดับ'),
-        h('th', { scope: 'col' }, 'ชื่อรายการ'),
+        h('th', { scope: 'col', class: 'col-name' }, 'ชื่อรายการ'),
         MONTHS_SHORT.map((m, i) => h('th', { scope: 'col', class: colCls(i) }, m)),
         h('th', { scope: 'col', class: 'num' }, 'ทั้งปี'))),
       h('tbody', {},

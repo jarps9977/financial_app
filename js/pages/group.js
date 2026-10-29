@@ -173,7 +173,7 @@ function itemsCard(data, group, rows, sel, monthly, checked, amountOf) {
     h('table', { class: 'data group-table' },
       h('thead', {}, h('tr', {},
         h('th', { scope: 'col', class: 'col-check' }, selectAll('เลือกทั้งหมดในตาราง')),
-        h('th', { scope: 'col' }, 'รายการ'),
+        h('th', { scope: 'col', class: 'col-name' }, 'รายการ'),
         MONTHS_SHORT.map((m, i) => h('th', { scope: 'col', class: selCls(i) }, m)),
         h('th', { scope: 'col', class: 'num col-total' }, 'รวม'),
         h('th', { scope: 'col', class: 'col-range' }, 'ช่วงเวลา'))),
@@ -188,7 +188,7 @@ function itemsCard(data, group, rows, sel, monthly, checked, amountOf) {
         h('td', { class: 'nowrap col-range' }, rangeText(r.item) || '–')))),
       h('tfoot', {}, h('tr', {},
         h('td', { class: 'col-check' }),
-        h('th', { scope: 'row' }, 'รวม'),
+        h('th', { scope: 'row', class: 'col-name' }, 'รวม'),
         monthly.map((v, i) => h('td', { class: selCls(i) }, money(v))),
         h('td', { class: 'num col-total' }, money(sum(monthly))),
         h('td', { class: 'col-range' })))));

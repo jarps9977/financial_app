@@ -1160,6 +1160,9 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 .data tbody th { font-weight: 500; position: sticky; left: 0; background: var(--surface); }
 .data tfoot th, .data tfoot td { font-weight: 700; background: var(--surface-2); border-bottom: 0; }
 .data .is-sel { background: var(--primary-soft); }
+/* Name column header/footer stay pinned like the body names; corner cell sits above both scroll axes */
+.data .col-name { position: sticky; left: 0; z-index: 1; }
+.data thead .col-name { z-index: 3; }
 
 /* ---------- Group items card: selection toolbar + table ---------- */
 .items-card { padding: 0; overflow: hidden; }
