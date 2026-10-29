@@ -8,7 +8,7 @@ import { Button } from '../components/button.js';
 import { Stat, MonthChips, Notice, YearSelect, kv } from '../components/misc.js';
 import { LazyList } from '../components/lazy-list.js';
 import { openSheet } from '../components/bottom-sheet.js';
-import { confirmAction } from '../components/alert.js';
+import { confirmAction, runTask } from '../components/alert.js';
 import { withData, Empty } from '../components/states.js';
 import { icon } from '../components/icon.js';
 
@@ -24,6 +24,7 @@ export default {
 };
 
 const displayName = (item) => item.name || '(ไม่มีชื่อ)';
+const MAX_AMOUNT = 1e9;
 
 function rangeText(item) {
   if (item.start && item.end) return `${ymLabel(item.start)} – ${ymLabel(item.end)}`;
@@ -174,8 +175,8 @@ function itemsCard(data, group, rows, sel, monthly, checked, amountOf) {
         h('th', { scope: 'col', class: 'col-check' }, selectAll('เลือกทั้งหมดในตาราง')),
         h('th', { scope: 'col' }, 'รายการ'),
         MONTHS_SHORT.map((m, i) => h('th', { scope: 'col', class: selCls(i) }, m)),
-        h('th', { scope: 'col', class: 'num' }, 'รวม'),
-        h('th', { scope: 'col' }, 'ช่วงเวลา'))),
+        h('th', { scope: 'col', class: 'num col-total' }, 'รวม'),
+        h('th', { scope: 'col', class: 'col-range' }, 'ช่วงเวลา'))),
       h('tbody', {}, rows.map((r) => h('tr', { class: checked.has(r.item.row) ? 'is-selected' : null },
         h('td', { class: 'col-check' }, rowCheck(r.item)),
         h('th', { scope: 'row' }, h('button', {
@@ -183,14 +184,14 @@ function itemsCard(data, group, rows, sel, monthly, checked, amountOf) {
           onClick: () => (isSelecting() ? toggleRow(r.item.row) : openItem(data, group, r.item)),
         }, displayName(r.item))),
         r.months.map((v, i) => h('td', { class: selCls(i) }, v ? money(v) : '–')),
-        h('td', { class: 'num' }, money(sum(r.months))),
-        h('td', { class: 'nowrap muted' }, rangeText(r.item) || '–')))),
+        h('td', { class: 'num col-total' }, money(sum(r.months))),
+        h('td', { class: 'nowrap col-range' }, rangeText(r.item) || '–')))),
       h('tfoot', {}, h('tr', {},
         h('td', { class: 'col-check' }),
         h('th', { scope: 'row' }, 'รวม'),
         monthly.map((v, i) => h('td', { class: selCls(i) }, money(v))),
-        h('td', { class: 'num' }, money(sum(monthly))),
-        h('td', {})))));
+        h('td', { class: 'num col-total' }, money(sum(monthly))),
+        h('td', { class: 'col-range' })))));
 
   const list = LazyList(rows, (r) => h('div', { class: `select-row${checked.has(r.item.row) ? ' is-selected' : ''}` },
     rowCheck(r.item),
@@ -247,22 +248,67 @@ function openItem(data, group, item) {
     });
   }
 
+  // Month amounts are edited in place; formula months stay read-only. Full form is behind "แก้ไข"
+  const inputs = item.values.map((v, i) => (item.formulas[i] ? null : h('input', {
+    type: 'number', class: 'input month-amount', inputmode: 'decimal', step: '0.01', placeholder: '–',
+    value: v == null ? '' : String(v), 'aria-label': `ยอด ${MONTHS[i]}`,
+  })));
+  const readValues = () => inputs.map((el, i) => {
+    if (!el) return item.values[i];
+    const s = el.value.trim();
+    if (s === '') return null;
+    const n = Number(s);
+    return Number.isFinite(n) && Math.abs(n) <= MAX_AMOUNT ? n : undefined;
+  });
+  const totalText = h('span', {}, `${money(sum(item.values))} บาท`);
+  const saveBtn = Button({ label: 'บันทึก', icon: 'check2', variant: 'accent', onClick: save });
+  saveBtn.hidden = true;
+  inputs.forEach((el) => el && el.addEventListener('input', () => {
+    const values = readValues();
+    el.closest('li').classList.toggle('is-invalid', values[inputs.indexOf(el)] === undefined);
+    totalText.textContent = `${money(sum(values.map((v) => v || 0)))} บาท`;
+    saveBtn.hidden = values.every((v, i) => v === (item.values[i] ?? null));
+  }));
+
+  async function save() {
+    const values = readValues();
+    const bad = values.findIndex((v) => v === undefined);
+    if (bad !== -1) {
+      inputs[bad].focus();
+      return;
+    }
+    ref.close();
+    await runTask({
+      title: 'กำลังบันทึกยอดรายเดือน...',
+      text: displayName(item),
+      success: 'บันทึกสำเร็จ',
+      successText: `${displayName(item)} · หมวด ${group.name}`,
+      task: () => mutate('updateItem', {
+        group: group.name, row: item.row, expectedName: item.name, name: item.name,
+        values, start: item.start, end: item.end, amount: item.amount,
+      }),
+    });
+  }
+
   const ref = openSheet({
     title: displayName(item),
     content: [
       h('dl', { class: 'kv' },
         kv('หมวด', group.name),
-        kv(`รวมปี ${data.year}`, `${money(sum(item.values))} บาท`),
+        kv(`รวมปี ${data.year}`, totalText),
         kv('ยอด/เดือน', item.amount != null ? `${money(item.amount)} บาท` : 'ไม่ระบุ'),
         kv('ช่วงเวลา', rangeText(item) || 'ไม่ระบุ')),
-      h('ul', { class: 'month-grid', 'aria-label': `ยอดรายเดือนปี ${data.year}` }, item.values.map((v, i) => h('li', {},
-        h('span', { class: 'muted' }, MONTHS_SHORT[i]),
-        h('span', { class: 'num' }, v == null ? '–' : money(v))))),
+      h('ul', { class: 'month-grid is-editable', 'aria-label': `ยอดรายเดือนปี ${data.year}` }, item.values.map((v, i) => h('li', {},
+        inputs[i]
+          ? h('label', {}, h('span', { class: 'muted' }, MONTHS_SHORT[i]), inputs[i])
+          : [h('span', { class: 'muted' }, MONTHS_SHORT[i]), h('span', { class: 'num', title: 'สูตรใน Sheet' }, v == null ? '–' : money(v))]))),
       hasFormula && h('p', { class: 'note' }, 'บางเดือนเป็นสูตรใน Sheet แอปจะไม่แก้ทับช่องนั้น'),
     ],
     actions: [
+      saveBtn,
+      Button({ label: 'แก้ไข', icon: 'pencil', variant: 'secondary', href: editHref, onClick: () => ref.close() }),
       Button({ label: 'ลบ', icon: 'trash', variant: 'danger-ghost', onClick: remove }),
-      Button({ label: 'แก้ไข', icon: 'pencil', href: editHref, onClick: () => ref.close() }),
+      Button({ label: 'ปิด', icon: 'x-lg', variant: 'ghost', onClick: () => ref.close() }),
     ],
   });
 }

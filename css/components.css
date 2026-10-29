@@ -748,6 +748,16 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 .month-grid li { display: flex; flex-direction: column; padding: var(--space-2); background: var(--surface-2); border-radius: var(--radius-sm); font-size: var(--fs-sm); }
 .month-grid .num { text-align: left; font-weight: 600; }
 @media (min-width: 640px) { .month-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.month-grid.is-editable li { border: 1px solid transparent; }
+.month-grid.is-editable li:focus-within { border-color: var(--teal-2); }
+.month-grid.is-editable li.is-invalid { border-color: var(--neg); }
+.month-grid.is-editable label { display: flex; flex-direction: column; gap: var(--space-1); }
+.month-grid .month-amount { min-height: 2.25rem; padding: 0 var(--space-2); text-align: left; font-weight: 600; background: var(--surface); }
+/* Item sheet can hold 4 actions; let them wrap on phones instead of squeezing */
+@media (max-width: 639px) {
+  .sheet-actions { flex-wrap: wrap; }
+  .sheet-actions .btn { flex: 1 1 auto; }
+}
 
 /* ---------- Bars / meter ---------- */
 .bars { display: grid; gap: var(--space-2); }
@@ -1205,6 +1215,13 @@ select.input { appearance: none; padding-right: 2.25rem; background-image: linea
 .group-table tbody tr.is-selected td, .group-table tbody tr.is-selected th { background: color-mix(in srgb, var(--teal) 8%, var(--surface)); }
 .group-table tfoot th, .group-table tfoot td { background: color-mix(in srgb, var(--teal) 10%, var(--surface)); }
 .group-table tfoot .is-sel { background: color-mix(in srgb, var(--teal) 24%, var(--surface)); }
+/* Summary columns: total in purple, range in blue, split from the month cells by a divider */
+.group-table .col-total { border-left: 1px solid color-mix(in srgb, var(--purple) 45%, var(--border)); background: color-mix(in srgb, var(--purple) 10%, var(--surface)); color: var(--acc-purple); font-weight: 700; }
+.group-table .col-range { background: color-mix(in srgb, var(--blue) 8%, var(--surface)); color: var(--acc-blue); }
+.group-table thead .col-total { background: color-mix(in srgb, var(--purple) 18%, var(--surface-2)); }
+.group-table thead .col-range { background: color-mix(in srgb, var(--blue) 14%, var(--surface-2)); }
+.group-table tfoot .col-total { background: color-mix(in srgb, var(--purple) 20%, var(--surface)); }
+.group-table tfoot .col-range { background: color-mix(in srgb, var(--blue) 12%, var(--surface)); }
 
 .report-table .col-idx { width: 3rem; text-align: center; color: var(--text-2); }
 .report-table .row-label { text-align: right; font-weight: 700; }

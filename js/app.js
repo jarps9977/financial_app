@@ -152,6 +152,12 @@ if (isUnlocked() && Date.now() - lastActive > AUTO_LOCK_MS) clearPin();
 lastActive = 0;
 markActive();
 
+// Number fields select their content on focus so typing replaces the value; deferred so mouseup does not clear it
+document.addEventListener('focusin', (e) => {
+  const el = e.target;
+  if (el instanceof HTMLInputElement && el.type === 'number') setTimeout(() => { if (document.activeElement === el) el.select(); }, 0);
+});
+
 window.addEventListener('hashchange', renderRoute);
 renderRoute();
 if (isConfigured() && isUnlocked()) refresh();
