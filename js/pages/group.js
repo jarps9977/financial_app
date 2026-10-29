@@ -197,7 +197,12 @@ function itemsCard(data, group, rows, sel, monthly, checked, amountOf) {
     rowCheck(r.item),
     itemRow(r.item, amountOf(r), () => (isSelecting() ? toggleRow(r.item.row) : openItem(data, group, r.item)))), { label: `รายการใน ${group.name}` });
 
-  card.append(toolbar, h('div', { class: 'only-compact items-list' }, list), h('div', { class: 'only-wide' }, table));
+  // Mobile counterpart of the table footer: total for the selected month (or the year)
+  const listTotal = h('div', { class: 'items-total' },
+    h('span', {}, sel === 'all' ? 'รวมทั้งปี' : `รวม ${MONTHS[sel]}`),
+    h('span', { class: 'num' }, money(sel === 'all' ? sum(monthly) : monthly[sel])));
+
+  card.append(toolbar, h('div', { class: 'only-compact items-list' }, list, listTotal), h('div', { class: 'only-wide' }, table));
   card.classList.toggle('is-selecting', Boolean(selectingByGroup[group.name]));
   sync();
   return card;

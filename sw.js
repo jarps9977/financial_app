@@ -1,5 +1,5 @@
 // Bump on every deploy so old shells are dropped
-const VERSION = 'ngern-v46';
+const VERSION = 'ngern-v47';
 
 const SHELL = [
   './',

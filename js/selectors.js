@@ -32,6 +32,10 @@ function projectedAmount(item) {
 // Sheet year uses real cell values; other years are projected from start/end/amount
 export function itemMonths(item, year, sheetYear) {
   if (year === sheetYear) return item.values.map((v) => Number(v) || 0);
+  return projectMonths(item, year, sheetYear);
+}
+
+function projectMonths(item, year, sheetYear) {
   const amount = projectedAmount(item);
   if (!amount) return zeros();
   const start = parseYm(item.start) || { y: sheetYear, m: 1 };
@@ -76,7 +80,9 @@ export function billsFor(data, year, month) {
   const ym = `${year}-${String(month).padStart(2, '0')}`;
   const paid = Array.isArray(data.paid) ? data.paid.filter((p) => p.ym === ym) : [];
   return expenseGroups(data).flatMap((g) => g.items.map((item) => {
-    const amount = itemMonths(item, year, data.year)[month - 1];
+    let amount = itemMonths(item, year, data.year)[month - 1];
+    // Sheet cell not filled yet (e.g. next month after payday): fall back to the item's range/amount
+    if (!amount && year === data.year && item.values[month - 1] == null) amount = projectMonths(item, year, data.year)[month - 1];
     const record = paid.find((p) => p.group === g.name && p.row === item.row && p.name === item.name);
     return { group: g.name, item, amount, paid: Boolean(record), paidAt: record ? record.paidAt : '' };
   })).filter((b) => b.amount);
