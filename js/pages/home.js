@@ -1,5 +1,5 @@
 import { h } from '../utils/dom.js';
-import { money, sum, MONTHS, MONTHS_SHORT, todayYm, ymKey } from '../utils/format.js';
+import { money, sum, MONTHS, MONTHS_SHORT, todayYm, payCycleYm, ymKey } from '../utils/format.js';
 import { groupPath } from '../router.js';
 import { buildReport, availableYears, incomeGroups, expenseGroups, itemMonths, groupMonths, billsFor, billEntries } from '../selectors.js';
 import { Card } from '../components/card.js';
@@ -170,9 +170,9 @@ function timelineCard(series, current, today, go) {
   });
 }
 
-// Outstanding bills always follow the real calendar (this month + next), not the focused month
+// Outstanding bills follow the pay cycle (rolls to next month on PAY_DAY), not the focused month
 function outstandingCard(data) {
-  const now = todayYm();
+  const now = payCycleYm();
   const next = shift(now, 1);
   // Entries: credit-card groups count as one bill; amounts still sum per item
   const bills = billEntries(data, now.y, now.m);

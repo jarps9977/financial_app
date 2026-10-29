@@ -29,6 +29,20 @@ export function todayYm() {
   return { y: d.getFullYear(), m: d.getMonth() + 1 };
 }
 
+// Salary lands on PAY_DAY, so from 00:00 that day the bills to pay belong to next month.
+// Clamped to the month's last day so short months (Feb) still roll over.
+export const PAY_DAY = 29;
+export function payCycleYm(d = new Date()) {
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  const k = ymKey(d.getFullYear(), d.getMonth() + 1) + (d.getDate() >= Math.min(PAY_DAY, lastDay) ? 1 : 0);
+  return { y: Math.floor(k / 12), m: (k % 12) + 1 };
+}
+
+// Delay to the next local midnight, used to re-check the pay cycle while a page stays open
+export function msUntilMidnight(d = new Date()) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1) - d + 1000;
+}
+
 export function isoDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

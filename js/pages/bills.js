@@ -1,5 +1,5 @@
 import { h } from '../utils/dom.js';
-import { money, sum, MONTHS, MONTHS_SHORT, todayYm, ymKey } from '../utils/format.js';
+import { money, sum, MONTHS, MONTHS_SHORT, payCycleYm, msUntilMidnight, ymKey } from '../utils/format.js';
 import { groupPath } from '../router.js';
 import { setPaid } from '../store.js';
 import { billEntries, availableYears, expenseGroups } from '../selectors.js';
@@ -12,8 +12,9 @@ import { ProgressBar } from '../components/progress.js';
 import { withData, Empty } from '../components/states.js';
 import { icon } from '../components/icon.js';
 
-// Month shown and expanded card bills survive repaints; starts at the current month
+// Month shown and expanded card bills survive repaints; starts at the current pay-cycle month
 let viewYm = null;
+let viewCycle = null;
 const expanded = new Set();
 
 export default {
@@ -28,12 +29,31 @@ const shift = ({ y, m }, delta) => {
 const ymText = ({ y, m }) => `${y}-${String(m).padStart(2, '0')}`;
 
 function view(data) {
-  const today = todayYm();
-  if (!viewYm) viewYm = { y: today.y, m: today.m };
+  let today = payCycleYm();
+  // New pay cycle (from 00:00 on PAY_DAY) jumps back to the cycle month
+  if (!viewYm || !viewCycle || ymKey(today.y, today.m) !== ymKey(viewCycle.y, viewCycle.m)) {
+    viewYm = { ...today };
+    viewCycle = { ...today };
+  }
   const go = (ym) => { viewYm = ym; rerender(); };
   const page = h('div', { class: 'stack' });
   const rerender = () => page.replaceChildren(...[content(data, viewYm, today, go)].flat().filter(Boolean));
   rerender();
+
+  // Re-check at each midnight while the page stays open; stops once the page is replaced
+  const tick = () => {
+    if (!page.isConnected) return;
+    const next = payCycleYm();
+    if (ymKey(next.y, next.m) !== ymKey(today.y, today.m)) {
+      const wasOnCycle = ymKey(viewYm.y, viewYm.m) === ymKey(today.y, today.m);
+      today = next;
+      viewCycle = { ...next };
+      if (wasOnCycle) viewYm = { ...next };
+      rerender();
+    }
+    setTimeout(tick, msUntilMidnight());
+  };
+  setTimeout(tick, msUntilMidnight());
   return page;
 }
 
