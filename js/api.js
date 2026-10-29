@@ -1,6 +1,8 @@
 import { getSettings, getPin, isValidApiUrl } from './settings.js';
 
 const TIMEOUT_MS = 25000;
+// Writes wait for the script lock and re-read the sheet, so a cold Apps Script can need longer than a load
+export const WRITE_TIMEOUT_MS = 60000;
 
 export class ApiError extends Error {
   constructor(message, code) {
@@ -25,12 +27,12 @@ export function isGroupPatch(d) {
 }
 
 // isValid checks the response shape; partial actions (setPaid) pass their own check
-export async function call(action, payload = {}, isValid = isValidData) {
+export async function call(action, payload = {}, isValid = isValidData, { timeout = TIMEOUT_MS } = {}) {
   const { apiUrl, passcode } = getSettings();
   if (!isValidApiUrl(apiUrl)) throw new ApiError('ยังไม่ได้ตั้งค่า API URL', 'config');
 
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), timeout);
   let res;
   try {
     // text/plain keeps this a CORS simple request; Apps Script cannot answer preflight
@@ -47,7 +49,7 @@ export async function call(action, payload = {}, isValid = isValidData) {
   } catch (e) {
     throw new ApiError(
       e.name === 'AbortError' ? 'หมดเวลาเชื่อมต่อ ลองใหม่อีกครั้ง' : 'เชื่อมต่อไม่ได้ ตรวจสอบอินเทอร์เน็ต',
-      'network',
+      e.name === 'AbortError' ? 'timeout' : 'network',
     );
   } finally {
     clearTimeout(timer);

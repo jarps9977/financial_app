@@ -1,4 +1,4 @@
-import { call, isValidData, isGroupPatch } from './api.js';
+import { call, isValidData, isGroupPatch, ApiError, WRITE_TIMEOUT_MS } from './api.js';
 import { startProgress } from './components/progress.js';
 
 const CACHE_KEY = 'ngern.cache.v2';
@@ -82,8 +82,21 @@ function mergeGroups(data, patch) {
 }
 
 // Writes return only the changed groups (old backends may still send the full dataset); progress UI is the caller's
+// A write that timed out may still have been applied by Apps Script: reload so the UI shows the real state
+async function writeCall(action, payload, isValid) {
+  try {
+    return await call(action, payload, isValid, { timeout: WRITE_TIMEOUT_MS });
+  } catch (e) {
+    if (e && e.code === 'timeout') {
+      refresh({ fresh: true, force: true });
+      throw new ApiError('หมดเวลารอ Google Sheets อาจบันทึกไปแล้ว กำลังโหลดข้อมูลล่าสุด ตรวจสอบก่อนลองใหม่', 'timeout');
+    }
+    throw e;
+  }
+}
+
 export async function mutate(action, payload) {
-  const res = await call(action, payload, (d) => isValidData(d) || isGroupPatch(d));
+  const res = await writeCall(action, payload, (d) => isValidData(d) || isGroupPatch(d));
   if (isGroupPatch(res)) {
     // Nothing cached to patch into: fall back to a full load
     if (!state.data) return refresh();
@@ -98,7 +111,7 @@ export async function mutate(action, payload) {
 
 // setPaid answers with the paid list only, merged into the cached dataset
 export async function setPaid(payload) {
-  const res = await call('setPaid', payload, (d) => d && Array.isArray(d.paid));
+  const res = await writeCall('setPaid', payload, (d) => d && Array.isArray(d.paid));
   if (state.data) setData({ ...state.data, paid: res.paid });
   state.error = null;
   emit();
