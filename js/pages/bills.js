@@ -59,9 +59,10 @@ function view(data) {
 
 function content(data, current, today, go) {
   const ym = ymText(current);
+  const groupOrder = new Map(expenseGroups(data).map((g, i) => [g.name, i]));
   const bills = billEntries(data, current.y, current.m)
-    // Unpaid first, then by amount so the big ones are on top
-    .sort((a, b) => (a.paid - b.paid) || (b.amount - a.amount));
+    // Grouped by category (sheet order), then unpaid first, then by amount so the big ones are on top
+    .sort((a, b) => (groupOrder.get(a.group) - groupOrder.get(b.group)) || (a.paid - b.paid) || (b.amount - a.amount));
   const allItems = bills.flatMap((e) => e.items);
   const total = sum(allItems.map((b) => b.amount));
   // Amounts count per item so a half-paid card bill shows its real progress
